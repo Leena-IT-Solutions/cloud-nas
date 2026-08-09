@@ -94,7 +94,7 @@ def configure_rclone(rclone_bin, key_file, bucket_name):
     """Generate rclone.conf with bucket_policy_only=true."""
     log("Configuring Rclone connection for Google Cloud Storage...")
     cmd = (
-        f'"{rclone_bin}" config create {DEFAULT_REMOTE} google cloud storage '
+        f'"{rclone_bin}" config create {DEFAULT_REMOTE} googlecloudstorage '
         f'service_account_file "{key_file}" bucket_policy_only true'
     )
     ok, out = run_cmd(cmd)
