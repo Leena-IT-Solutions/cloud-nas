@@ -3,7 +3,7 @@
 
 Set WshShell = CreateObject("WScript.Shell")
 Set fso = CreateObject("Scripting.FileSystemObject")
-scriptDir = fso.GetParentFolderName(WScript.ScriptFullPath)
+scriptDir = fso.GetParentFolderName(WScript.ScriptFullName)
 
 ' Auto-detect rclone.exe path
 rcloneExe = "C:\rclone\rclone.exe"
