@@ -14,6 +14,7 @@ echo Mounting Google Cloud Storage Bucket '%BUCKET_NAME%' as %DRIVE_LETTER% Driv
     --vfs-cache-max-size 10G ^
     --vfs-cache-max-age 24h ^
     --vfs-write-back 1s ^
+    --gcs-bucket-policy-only ^
     --no-modtime
 
 echo Cloud NAS Drive %DRIVE_LETTER% is now live in Windows File Explorer!

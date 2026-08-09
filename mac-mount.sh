@@ -36,6 +36,7 @@ echo "Mounting Google Cloud Storage Bucket '$BUCKET_NAME' to '$MOUNT_POINT'..."
     --vfs-cache-max-age 24h \
     --vfs-write-back 1s \
     --allow-non-empty \
+    --gcs-bucket-policy-only \
     --volname "Cloud NAS" \
     --no-modtime \
     --daemon
