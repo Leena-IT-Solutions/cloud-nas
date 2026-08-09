@@ -5,17 +5,22 @@
 set BUCKET_NAME=sv-school
 set REMOTE_NAME=gcsnas
 set DRIVE_LETTER=Y:
-set RCLONE_PATH=C:\rclone\rclone.exe
+
+:: Auto-detect rclone.exe path
+if exist "C:\rclone\rclone.exe" (
+    set RCLONE_PATH=C:\rclone\rclone.exe
+) else if exist "%~dp0rclone.exe" (
+    set RCLONE_PATH=%~dp0rclone.exe
+) else (
+    set RCLONE_PATH=rclone.exe
+)
 
 echo Mounting Google Cloud Storage Bucket '%BUCKET_NAME%' as %DRIVE_LETTER% Drive...
 
-%RCLONE_PATH% mount %REMOTE_NAME%:%BUCKET_NAME% %DRIVE_LETTER% ^
+"%RCLONE_PATH%" mount %REMOTE_NAME%:%BUCKET_NAME% %DRIVE_LETTER% ^
     --vfs-cache-mode full ^
     --vfs-cache-max-size 10G ^
     --vfs-cache-max-age 24h ^
     --vfs-write-back 1s ^
     --gcs-bucket-policy-only ^
     --no-modtime
-
-echo Cloud NAS Drive %DRIVE_LETTER% is now live in Windows File Explorer!
-pause
