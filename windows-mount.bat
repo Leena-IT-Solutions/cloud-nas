@@ -4,7 +4,7 @@
 
 set BUCKET_NAME=sv-school
 set REMOTE_NAME=gcsnas
-set DRIVE_LETTER=Z:
+set DRIVE_LETTER=Y:
 set RCLONE_PATH=C:\rclone\rclone.exe
 
 echo Mounting Google Cloud Storage Bucket '%BUCKET_NAME%' as %DRIVE_LETTER% Drive...
