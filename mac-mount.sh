@@ -13,14 +13,20 @@ BUCKET_NAME="sv-school"            # GCP Bucket Name
 REMOTE_NAME="gcsnas"              # Rclone remote name
 MOUNT_POINT="$HOME/CloudNAS"      # Local mount directory in macOS Finder
 
-# Create mount directory if it doesn't exist
-mkdir -p "$MOUNT_POINT"
-
-# Check if already mounted
+# Check if already mounted cleanly
 if mount | grep -q "$MOUNT_POINT"; then
     echo "Cloud NAS is already mounted at $MOUNT_POINT"
     exit 0
 fi
+
+# Clean up stale FUSE mount points if needed
+if [ -d "$MOUNT_POINT" ]; then
+    diskutil unmount force "$MOUNT_POINT" >/dev/null 2>&1
+    umount -f "$MOUNT_POINT" >/dev/null 2>&1
+fi
+
+# Create fresh mount directory
+mkdir -p "$MOUNT_POINT"
 
 echo "Mounting Google Cloud Storage Bucket '$BUCKET_NAME' to '$MOUNT_POINT'..."
 
