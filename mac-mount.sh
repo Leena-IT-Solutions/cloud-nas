@@ -1,10 +1,16 @@
 #!/usr/bin/env bash
 
 # macOS Cloud NAS Auto-Mount Script
-# Ensure rclone and macfuse are installed via `brew install macfuse rclone`
+SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+RCLONE_BIN="$SCRIPT_DIR/rclone"
 
-BUCKET_NAME="sv-school"   # Replace with your GCP Bucket Name
-REMOTE_NAME="gcsnas"              # Rclone remote name configured in `rclone config`
+# Fallback to system rclone if local binary not found
+if [ ! -f "$RCLONE_BIN" ]; then
+    RCLONE_BIN="rclone"
+fi
+
+BUCKET_NAME="sv-school"            # GCP Bucket Name
+REMOTE_NAME="gcsnas"              # Rclone remote name
 MOUNT_POINT="$HOME/CloudNAS"      # Local mount directory in macOS Finder
 
 # Create mount directory if it doesn't exist
@@ -18,7 +24,7 @@ fi
 
 echo "Mounting Google Cloud Storage Bucket '$BUCKET_NAME' to '$MOUNT_POINT'..."
 
-rclone mount "$REMOTE_NAME:$BUCKET_NAME" "$MOUNT_POINT" \
+"$RCLONE_BIN" mount "$REMOTE_NAME:$BUCKET_NAME" "$MOUNT_POINT" \
     --vfs-cache-mode full \
     --vfs-cache-max-size 10G \
     --vfs-cache-max-age 24h \
