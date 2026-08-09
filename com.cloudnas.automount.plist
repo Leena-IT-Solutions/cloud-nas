@@ -8,7 +8,7 @@
     <array>
         <string>/usr/local/bin/rclone</string>
         <string>mount</string>
-        <string>gcsnas:sandeep-cloud-nas</string>
+        <string>gcsnas:sv-school</string>
         <string>/Users/sandeep/CloudNAS</string>
         <string>--vfs-cache-mode</string>
         <string>full</string>

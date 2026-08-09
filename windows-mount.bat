@@ -2,7 +2,7 @@
 :: Windows Cloud NAS Auto-Mount Script
 :: Ensure WinFSP and Rclone are installed
 
-set BUCKET_NAME=sandeep-cloud-nas
+set BUCKET_NAME=sv-school
 set REMOTE_NAME=gcsnas
 set DRIVE_LETTER=Z:
 set RCLONE_PATH=C:\rclone\rclone.exe

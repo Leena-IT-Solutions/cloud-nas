@@ -3,7 +3,7 @@
 # macOS Cloud NAS Auto-Mount Script
 # Ensure rclone and macfuse are installed via `brew install macfuse rclone`
 
-BUCKET_NAME="sandeep-cloud-nas"   # Replace with your GCP Bucket Name
+BUCKET_NAME="sv-school"   # Replace with your GCP Bucket Name
 REMOTE_NAME="gcsnas"              # Rclone remote name configured in `rclone config`
 MOUNT_POINT="$HOME/CloudNAS"      # Local mount directory in macOS Finder
 
