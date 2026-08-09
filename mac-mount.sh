@@ -28,6 +28,7 @@ echo "Mounting Google Cloud Storage Bucket '$BUCKET_NAME' to '$MOUNT_POINT'..."
     --vfs-cache-mode full \
     --vfs-cache-max-size 10G \
     --vfs-cache-max-age 24h \
+    --allow-non-empty \
     --no-modtime \
     --daemon
 
