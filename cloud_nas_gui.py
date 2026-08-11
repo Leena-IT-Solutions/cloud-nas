@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """
 Cloud NAS Desktop Control Center & Live Monitor
-Provides Authentication (admin/password), User & Permission Management, real-time Upload/Download speeds,
-Transfer Queue, Push/Pull/Refresh buttons, Drive Renaming, and Live File Activity Logging.
+Provides Admin Authentication (admin/password), Folder-Level Access & User Permissions Management,
+real-time Upload/Download speeds, Transfer Queue, Push/Pull/Refresh buttons, Drive Renaming, and Live File Activity Logging.
 Pure Tkinter custom widgets for 100% reliable dark mode rendering on macOS & Windows.
 """
 
@@ -59,8 +59,8 @@ class CloudNASApp:
     def __init__(self, root):
         self.root = root
         self.root.title("Cloud NAS - Control Center & Permissions Manager")
-        self.root.geometry("660x600")
-        self.root.minsize(620, 520)
+        self.root.geometry("700x640")
+        self.root.minsize(660, 540)
         self.root.configure(bg="#181825")  # Dark Catppuccin Base
 
         # Apply Window Icon if available
@@ -93,20 +93,26 @@ class CloudNASApp:
                         "username": "admin",
                         "password": "password",
                         "role": "Admin",
-                        "permission": "Full Access (Read/Write)",
+                        "folder_scope": "Full Access (All Folders)",
+                        "folder_path": "/",
+                        "permission": "Read-Write",
                         "created_at": datetime.now().strftime("%Y-%m-%d %H:%M")
                     },
                     {
                         "username": "Sandeep Rathod",
                         "password": "password",
                         "role": "User",
-                        "permission": "Full Access (Read/Write)",
+                        "folder_scope": "Specific Folder",
+                        "folder_path": "/Sandeep",
+                        "permission": "Read-Write",
                         "created_at": datetime.now().strftime("%Y-%m-%d %H:%M")
                     },
                     {
                         "username": "Leena Adam",
                         "password": "password",
                         "role": "User",
+                        "folder_scope": "Specific Folder",
+                        "folder_path": "/Leena",
                         "permission": "Read-Only",
                         "created_at": datetime.now().strftime("%Y-%m-%d %H:%M")
                     }
@@ -134,7 +140,6 @@ class CloudNASApp:
     # 🔐 LOGIN SCREEN VIEW
     # ==========================================
     def show_login_screen(self):
-        # Clear existing widgets
         for widget in self.root.winfo_children():
             widget.destroy()
 
@@ -175,7 +180,6 @@ class CloudNASApp:
         )
         btn_login.pack(fill="x")
 
-        # Keybinding for Enter key
         self.root.bind("<Return>", lambda e: self.handle_login())
 
     def handle_login(self):
@@ -511,38 +515,59 @@ class CloudNASApp:
 
         tk.Label(add_card, text="➕ ADD NEW USER & ACCESS PERMISSION", bg="#1e1e2e", fg="#cdd6f4", font=("Segoe UI", 10, "bold")).pack(anchor="w", pady=(0, 8))
 
-        form_fields = tk.Frame(add_card, bg="#1e1e2e")
-        form_fields.pack(fill="x")
+        form_grid = tk.Frame(add_card, bg="#1e1e2e")
+        form_grid.pack(fill="x")
 
-        # Username
-        col1 = tk.Frame(form_fields, bg="#1e1e2e")
-        col1.pack(side="left", padx=(0, 10))
-        tk.Label(col1, text="Username:", bg="#1e1e2e", fg="#a6adc8", font=("Segoe UI", 8, "bold")).pack(anchor="w")
-        self.new_uname_entry = tk.Entry(col1, bg="#181825", fg="#cdd6f4", insertbackground="#cdd6f4", font=("Segoe UI", 9), relief="flat", highlightthickness=1, highlightbackground="#313244", width=16)
+        # Row 1: Username & Password
+        row1 = tk.Frame(form_grid, bg="#1e1e2e")
+        row1.pack(fill="x", pady=(0, 8))
+
+        col_u = tk.Frame(row1, bg="#1e1e2e")
+        col_u.pack(side="left", padx=(0, 12))
+        tk.Label(col_u, text="Username:", bg="#1e1e2e", fg="#a6adc8", font=("Segoe UI", 8, "bold")).pack(anchor="w")
+        self.new_uname_entry = tk.Entry(col_u, bg="#181825", fg="#cdd6f4", insertbackground="#cdd6f4", font=("Segoe UI", 9), relief="flat", highlightthickness=1, highlightbackground="#313244", width=18)
         self.new_uname_entry.pack()
 
-        # Password
-        col2 = tk.Frame(form_fields, bg="#1e1e2e")
-        col2.pack(side="left", padx=(0, 10))
-        tk.Label(col2, text="Password:", bg="#1e1e2e", fg="#a6adc8", font=("Segoe UI", 8, "bold")).pack(anchor="w")
-        self.new_pass_entry = tk.Entry(col2, bg="#181825", fg="#cdd6f4", insertbackground="#cdd6f4", font=("Segoe UI", 9), relief="flat", highlightthickness=1, highlightbackground="#313244", width=14)
+        col_p = tk.Frame(row1, bg="#1e1e2e")
+        col_p.pack(side="left", padx=(0, 12))
+        tk.Label(col_p, text="Password:", bg="#1e1e2e", fg="#a6adc8", font=("Segoe UI", 8, "bold")).pack(anchor="w")
+        self.new_pass_entry = tk.Entry(col_p, bg="#181825", fg="#cdd6f4", insertbackground="#cdd6f4", font=("Segoe UI", 9), relief="flat", highlightthickness=1, highlightbackground="#313244", width=18)
         self.new_pass_entry.pack()
 
-        # Permission Selector
-        col3 = tk.Frame(form_fields, bg="#1e1e2e")
-        col3.pack(side="left", padx=(0, 10))
-        tk.Label(col3, text="Permission Level:", bg="#1e1e2e", fg="#a6adc8", font=("Segoe UI", 8, "bold")).pack(anchor="w")
+        # Row 2: Folder Access Scope, Specific Folder Path, & Permission Mode
+        row2 = tk.Frame(form_grid, bg="#1e1e2e")
+        row2.pack(fill="x")
+
+        col_scope = tk.Frame(row2, bg="#1e1e2e")
+        col_scope.pack(side="left", padx=(0, 12))
+        tk.Label(col_scope, text="Folder Access Scope:", bg="#1e1e2e", fg="#a6adc8", font=("Segoe UI", 8, "bold")).pack(anchor="w")
         
-        self.perm_var = tk.StringVar(value="Full Access (Read/Write)")
-        perm_opt = tk.OptionMenu(col3, self.perm_var, "Full Access (Read/Write)", "Read-Only", "Restricted Access")
+        self.scope_var = tk.StringVar(value="Full Access (All Folders)")
+        scope_opt = tk.OptionMenu(col_scope, self.scope_var, "Full Access (All Folders)", "Specific Folder Only", command=self.on_scope_change)
+        scope_opt.config(bg="#181825", fg="#cdd6f4", activebackground="#313244", font=("Segoe UI", 8), highlightthickness=0)
+        scope_opt["menu"].config(bg="#1e1e2e", fg="#cdd6f4")
+        scope_opt.pack()
+
+        col_folder = tk.Frame(row2, bg="#1e1e2e")
+        col_folder.pack(side="left", padx=(0, 12))
+        tk.Label(col_folder, text="Folder Path / Name:", bg="#1e1e2e", fg="#a6adc8", font=("Segoe UI", 8, "bold")).pack(anchor="w")
+        self.new_folder_entry = tk.Entry(col_folder, bg="#181825", fg="#cdd6f4", insertbackground="#cdd6f4", font=("Segoe UI", 9), relief="flat", highlightthickness=1, highlightbackground="#313244", width=16)
+        self.new_folder_entry.insert(0, "/")
+        self.new_folder_entry.pack()
+
+        col_perm = tk.Frame(row2, bg="#1e1e2e")
+        col_perm.pack(side="left", padx=(0, 12))
+        tk.Label(col_perm, text="Permission Type:", bg="#1e1e2e", fg="#a6adc8", font=("Segoe UI", 8, "bold")).pack(anchor="w")
+        self.perm_var = tk.StringVar(value="Read-Write")
+        perm_opt = tk.OptionMenu(col_perm, self.perm_var, "Read-Write", "Read-Only")
         perm_opt.config(bg="#181825", fg="#cdd6f4", activebackground="#313244", font=("Segoe UI", 8), highlightthickness=0)
         perm_opt["menu"].config(bg="#1e1e2e", fg="#cdd6f4")
         perm_opt.pack()
 
         # Save Button
         btn_add = DarkButton(
-            form_fields, text="Save User", command=self.handle_add_user,
-            bg="#a6e3a1", fg="#11111b", hover_bg="#94e2d5", font=("Segoe UI", 8, "bold"), padx=12, pady=3
+            row2, text="Save User", command=self.handle_add_user,
+            bg="#a6e3a1", fg="#11111b", hover_bg="#94e2d5", font=("Segoe UI", 8, "bold"), padx=14, pady=4
         )
         btn_add.pack(side="left", pady=(14, 0))
 
@@ -554,6 +579,15 @@ class CloudNASApp:
 
         self.render_users_table()
 
+    def on_scope_change(self, val):
+        if val == "Full Access (All Folders)":
+            self.new_folder_entry.delete(0, "end")
+            self.new_folder_entry.insert(0, "/")
+        else:
+            if self.new_folder_entry.get() == "/":
+                self.new_folder_entry.delete(0, "end")
+                self.new_folder_entry.insert(0, "/Projects")
+
     def render_users_table(self):
         for widget in self.users_list_frame.winfo_children():
             widget.destroy()
@@ -562,11 +596,12 @@ class CloudNASApp:
         headers_frame = tk.Frame(self.users_list_frame, bg="#313244", padx=8, pady=5)
         headers_frame.pack(fill="x", pady=(0, 5))
 
-        tk.Label(headers_frame, text="USERNAME", bg="#313244", fg="#cdd6f4", font=("Segoe UI", 8, "bold"), width=18, anchor="w").pack(side="left")
-        tk.Label(headers_frame, text="ROLE", bg="#313244", fg="#cdd6f4", font=("Segoe UI", 8, "bold"), width=10, anchor="w").pack(side="left")
-        tk.Label(headers_frame, text="PERMISSION", bg="#313244", fg="#cdd6f4", font=("Segoe UI", 8, "bold"), width=24, anchor="w").pack(side="left")
-        tk.Label(headers_frame, text="CREATED AT", bg="#313244", fg="#cdd6f4", font=("Segoe UI", 8, "bold"), width=16, anchor="w").pack(side="left")
-        tk.Label(headers_frame, text="ACTION", bg="#313244", fg="#cdd6f4", font=("Segoe UI", 8, "bold"), width=10, anchor="w").pack(side="left")
+        tk.Label(headers_frame, text="USERNAME", bg="#313244", fg="#cdd6f4", font=("Segoe UI", 8, "bold"), width=16, anchor="w").pack(side="left")
+        tk.Label(headers_frame, text="ROLE", bg="#313244", fg="#cdd6f4", font=("Segoe UI", 8, "bold"), width=8, anchor="w").pack(side="left")
+        tk.Label(headers_frame, text="FOLDER ACCESS", bg="#313244", fg="#cdd6f4", font=("Segoe UI", 8, "bold"), width=18, anchor="w").pack(side="left")
+        tk.Label(headers_frame, text="PERMISSION", bg="#313244", fg="#cdd6f4", font=("Segoe UI", 8, "bold"), width=14, anchor="w").pack(side="left")
+        tk.Label(headers_frame, text="CREATED AT", bg="#313244", fg="#cdd6f4", font=("Segoe UI", 8, "bold"), width=14, anchor="w").pack(side="left")
+        tk.Label(headers_frame, text="ACTION", bg="#313244", fg="#cdd6f4", font=("Segoe UI", 8, "bold"), width=8, anchor="w").pack(side="left")
 
         # Table Rows
         users = self.users_data.get("users", [])
@@ -577,13 +612,18 @@ class CloudNASApp:
 
             uname = u["username"]
             role = u.get("role", "User")
-            perm = u.get("permission", "Full Access")
+            scope = u.get("folder_scope", "Full Access")
+            fpath = u.get("folder_path", "/")
+            perm = u.get("permission", "Read-Write")
             created = u.get("created_at", "-")
 
-            tk.Label(row, text=uname, bg=row_bg, fg="#cdd6f4", font=("Segoe UI", 9, "bold"), width=18, anchor="w").pack(side="left")
-            tk.Label(row, text=role, bg=row_bg, fg="#89b4fa", font=("Segoe UI", 8, "bold"), width=10, anchor="w").pack(side="left")
-            tk.Label(row, text=perm, bg=row_bg, fg="#a6e3a1" if "Full" in perm else "#f9e2af", font=("Segoe UI", 8), width=24, anchor="w").pack(side="left")
-            tk.Label(row, text=created, bg=row_bg, fg="#bac2de", font=("Segoe UI", 8), width=16, anchor="w").pack(side="left")
+            folder_display = "🌐 All Folders" if scope == "Full Access (All Folders)" or fpath == "/" else f"📁 {fpath}"
+
+            tk.Label(row, text=uname, bg=row_bg, fg="#cdd6f4", font=("Segoe UI", 9, "bold"), width=16, anchor="w").pack(side="left")
+            tk.Label(row, text=role, bg=row_bg, fg="#89b4fa", font=("Segoe UI", 8, "bold"), width=8, anchor="w").pack(side="left")
+            tk.Label(row, text=folder_display, bg=row_bg, fg="#f9e2af" if "/" in folder_display else "#89b4fa", font=("Segoe UI", 8, "bold"), width=18, anchor="w").pack(side="left")
+            tk.Label(row, text=perm, bg=row_bg, fg="#a6e3a1" if "Write" in perm else "#f9e2af", font=("Segoe UI", 8), width=14, anchor="w").pack(side="left")
+            tk.Label(row, text=created, bg=row_bg, fg="#bac2de", font=("Segoe UI", 8), width=14, anchor="w").pack(side="left")
 
             if uname != "admin":
                 btn_del = DarkButton(
@@ -592,15 +632,20 @@ class CloudNASApp:
                 )
                 btn_del.pack(side="left")
             else:
-                tk.Label(row, text="System", bg=row_bg, fg="#a6adc8", font=("Segoe UI", 8, "italic"), width=10, anchor="w").pack(side="left")
+                tk.Label(row, text="System", bg=row_bg, fg="#a6adc8", font=("Segoe UI", 8, "italic"), width=8, anchor="w").pack(side="left")
 
     def handle_add_user(self):
         uname = self.new_uname_entry.get().strip()
         pword = self.new_pass_entry.get().strip()
+        scope = self.scope_var.get()
+        fpath = self.new_folder_entry.get().strip()
         perm = self.perm_var.get()
 
         if not uname or not pword:
             return
+
+        if not fpath or scope == "Full Access (All Folders)":
+            fpath = "/"
 
         # Check duplicate
         for u in self.users_data.get("users", []):
@@ -611,6 +656,8 @@ class CloudNASApp:
             "username": uname,
             "password": pword,
             "role": "User",
+            "folder_scope": scope,
+            "folder_path": fpath,
             "permission": perm,
             "created_at": datetime.now().strftime("%Y-%m-%d %H:%M")
         }
