@@ -900,29 +900,44 @@ class CloudNASApp:
         if not self.active_chat_recipient or not hasattr(self, "chat_msg_box"):
             return
         
+        recipient = self.active_chat_recipient
         current_u = self.logged_in_user.get("username", "") if self.logged_in_user else ""
-        messages = self.fetch_chat_history(current_u, self.active_chat_recipient)
 
         self.chat_msg_box.config(state="normal")
         self.chat_msg_box.delete("1.0", "end")
-
-        if not messages:
-            self.chat_msg_box.insert("end", f"No previous messages with {self.active_chat_recipient}. Send a message to start chatting!\n", "time")
-        else:
-            for m in messages:
-                sender = m.get("sender", "User")
-                text = m.get("text", "")
-                tstamp = m.get("timestamp", "")
-
-                if sender.lower() == current_u.lower():
-                    self.chat_msg_box.insert("end", f"[{tstamp}] You: ", "sent")
-                    self.chat_msg_box.insert("end", f"{text}\n")
-                else:
-                    self.chat_msg_box.insert("end", f"[{tstamp}] {sender}: ", "received")
-                    self.chat_msg_box.insert("end", f"{text}\n")
-
-        self.chat_msg_box.see("end")
+        self.chat_msg_box.insert("end", f"⏳ Syncing chat history with {recipient} from Cloud...\n", "time")
         self.chat_msg_box.config(state="disabled")
+
+        def _async_load():
+            messages = self.fetch_chat_history(current_u, recipient)
+            
+            def _update_gui():
+                if not hasattr(self, "chat_msg_box") or self.active_chat_recipient != recipient:
+                    return
+                self.chat_msg_box.config(state="normal")
+                self.chat_msg_box.delete("1.0", "end")
+
+                if not messages:
+                    self.chat_msg_box.insert("end", f"No previous messages with {recipient}. Send a message to start chatting!\n", "time")
+                else:
+                    for m in messages:
+                        sender = m.get("sender", "User")
+                        text = m.get("text", "")
+                        tstamp = m.get("timestamp", "")
+
+                        if sender.lower() == current_u.lower():
+                            self.chat_msg_box.insert("end", f"[{tstamp}] You: ", "sent")
+                            self.chat_msg_box.insert("end", f"{text}\n")
+                        else:
+                            self.chat_msg_box.insert("end", f"[{tstamp}] {sender}: ", "received")
+                            self.chat_msg_box.insert("end", f"{text}\n")
+
+                self.chat_msg_box.see("end")
+                self.chat_msg_box.config(state="disabled")
+
+            self.root.after(0, _update_gui)
+
+        threading.Thread(target=_async_load, daemon=True).start()
 
     # ==========================================
     # 👥 TAB 3: USERS & PERMISSIONS MANAGER
