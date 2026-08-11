@@ -1,10 +1,9 @@
 #!/usr/bin/env bash
 
-# macOS Cloud NAS Auto-Mount Script with User Permission & Folder Scoping
+# macOS 100% Zero-Dependency Driverless Cloud NAS Auto-Mount Script
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 RCLONE_BIN="$SCRIPT_DIR/rclone"
 
-# Fallback to system rclone if local binary not found
 if [ ! -f "$RCLONE_BIN" ]; then
     RCLONE_BIN="rclone"
 fi
@@ -42,31 +41,36 @@ fi
 MOUNT_POINT="$HOME/$VOL_NAME"
 
 # Unmount existing instance if running
+pkill -9 -f "rclone serve webdav" >/dev/null 2>&1
 pkill -9 -f "rclone mount" >/dev/null 2>&1
 if [ -d "$MOUNT_POINT" ]; then
-    diskutil unmount force "$MOUNT_POINT" >/dev/null 2>&1
     umount -f "$MOUNT_POINT" >/dev/null 2>&1
+    diskutil unmount force "$MOUNT_POINT" >/dev/null 2>&1
 fi
 
-# Create fresh mount directory
 mkdir -p "$MOUNT_POINT"
 
-echo "Mounting '$REMOTE_PATH' to '$MOUNT_POINT' (Volume: '$VOL_NAME')..."
+echo "Starting WebDAV Cloud Engine for '$REMOTE_PATH'..."
 
-nohup "$RCLONE_BIN" mount "$REMOTE_PATH" "$MOUNT_POINT" \
+# Launch Rclone Native WebDAV Engine on port 8080
+nohup "$RCLONE_BIN" serve webdav "$REMOTE_PATH" \
+    --addr 127.0.0.1:8080 \
     --vfs-cache-mode full \
     --vfs-cache-max-size 10G \
     --vfs-cache-max-age 24h \
     --vfs-write-back 1s \
     --dir-cache-time 10s \
     --attr-timeout 1s \
-    --allow-non-empty \
     --gcs-bucket-policy-only \
-    --volname "$VOL_NAME" \
     --rc \
     --rc-no-auth \
     --rc-addr 127.0.0.1:5572 \
     --no-modtime \
     $READ_ONLY_FLAG >/dev/null 2>&1 &
 
-echo "Cloud NAS mounted successfully at '$MOUNT_POINT'!"
+sleep 2
+
+# Mount natively in macOS Finder using built-in WebDAV client (ZERO macFUSE required!)
+mount_webdav http://127.0.0.1:8080 "$MOUNT_POINT" >/dev/null 2>&1
+
+echo "Cloud NAS mounted driverlessly at '$MOUNT_POINT'!"

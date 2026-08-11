@@ -26,20 +26,21 @@ echo "============================================================"
 
 # 1. Unmount Drive & Clean All Possible Mount Points
 echo "[INFO] Unmounting Cloud NAS drive ($VOL_NAME)..."
-diskutil unmount force "$HOME/$VOL_NAME" >/dev/null 2>&1
 umount -f "$HOME/$VOL_NAME" >/dev/null 2>&1
+diskutil unmount force "$HOME/$VOL_NAME" >/dev/null 2>&1
 
-diskutil unmount force "$HOME/CloudNAS" >/dev/null 2>&1
 umount -f "$HOME/CloudNAS" >/dev/null 2>&1
+diskutil unmount force "$HOME/CloudNAS" >/dev/null 2>&1
 
-diskutil unmount force "$HOME/Cloud NAS" >/dev/null 2>&1
 umount -f "$HOME/Cloud NAS" >/dev/null 2>&1
+diskutil unmount force "$HOME/Cloud NAS" >/dev/null 2>&1
 
-diskutil unmount force "$HOME/NAS" >/dev/null 2>&1
 umount -f "$HOME/NAS" >/dev/null 2>&1
+diskutil unmount force "$HOME/NAS" >/dev/null 2>&1
 
 # 2. Stop Rclone Processes & GUI
 echo "[INFO] Terminating rclone background processes and Control Center..."
+pkill -9 -f "rclone serve webdav" >/dev/null 2>&1
 pkill -9 -f "rclone mount" >/dev/null 2>&1
 pkill -9 -f "cloud_nas_gui.py" >/dev/null 2>&1
 
