@@ -77,6 +77,7 @@ echo.
     --vfs-cache-max-age 24h ^
     --vfs-write-back 1s ^
     --gcs-bucket-policy-only ^
+    --links ^
     --no-modtime
 
 echo.
