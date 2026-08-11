@@ -73,12 +73,12 @@ echo "[INFO] Configuring Rclone..."
 
 # Prepare Mount Point Directory
 echo "[INFO] Mounting Cloud NAS ($VOL_NAME) to $MOUNT_POINT..."
-pkill -9 -f "rclone serve webdav" >/dev/null 2>&1
 pkill -9 -f "rclone mount" >/dev/null 2>&1
-if [ -d "$MOUNT_POINT" ]; then
-    diskutil unmount force "$MOUNT_POINT" >/dev/null 2>&1
-    umount -f "$MOUNT_POINT" >/dev/null 2>&1
-fi
+diskutil unmount force "$MOUNT_POINT" >/dev/null 2>&1 || true
+umount -f "$MOUNT_POINT" >/dev/null 2>&1 || true
+sleep 1
+
+rm -rf "$MOUNT_POINT" >/dev/null 2>&1 || true
 mkdir -p "$MOUNT_POINT"
 
 # Launch rclone mount in background via nohup
