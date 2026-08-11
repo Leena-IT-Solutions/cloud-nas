@@ -41,36 +41,31 @@ IS_WIN = platform.system() == "Windows"
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 USERS_FILE = os.path.join(SCRIPT_DIR, "users_permissions.json")
 
-class DarkButton(tk.Label):
+class DarkButton(tk.Button):
     """Custom flat dark mode button with smooth hover effects for macOS & Windows."""
     def __init__(self, parent, text, command, bg, fg, hover_bg=None, font=("Segoe UI", 9, "bold"), padx=14, pady=6, **kwargs):
         self.command = command
         self.default_bg = bg
         self.hover_bg = hover_bg or bg
-        self._last_click = 0
         super().__init__(
             parent, 
             text=text, 
+            command=command,
             bg=bg, 
             fg=fg, 
+            activebackground=self.hover_bg,
+            activeforeground=fg,
             font=font, 
             padx=padx, 
             pady=pady, 
             cursor="hand2", 
             relief="flat",
+            bd=0,
+            highlightthickness=0,
             **kwargs
         )
-        self.bind("<Button-1>", lambda e: self.trigger_click())
-        self.bind("<ButtonRelease-1>", lambda e: self.trigger_click())
         self.bind("<Enter>", lambda e: self.config(bg=self.hover_bg))
         self.bind("<Leave>", lambda e: self.config(bg=self.default_bg))
-
-    def trigger_click(self):
-        now = time.time()
-        if now - self._last_click > 0.2:
-            self._last_click = now
-            if self.command:
-                self.command()
 
 class CloudNASApp:
     def __init__(self, root):
