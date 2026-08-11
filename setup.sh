@@ -8,6 +8,12 @@ REMOTE_NAME="gcsnas"
 MOUNT_POINT="$HOME/CloudNAS"
 RCLONE_BIN="$SCRIPT_DIR/rclone"
 
+# Resolve exact Python 3 binary path (e.g. Python 3.13 Framework)
+PYTHON_BIN="$(which python3)"
+if [ -z "$PYTHON_BIN" ]; then
+    PYTHON_BIN="/usr/bin/python3"
+fi
+
 echo "============================================================"
 echo "      🚀 macOS 1-Click Cloud NAS Installer 🚀"
 echo "============================================================"
@@ -93,11 +99,11 @@ EOF
 
 cat << EOF > "$APP_DIR/Contents/MacOS/Cloud NAS"
 #!/usr/bin/env bash
-exec /usr/bin/python3 "$SCRIPT_DIR/cloud_nas_gui.py"
+exec "$PYTHON_BIN" "$SCRIPT_DIR/cloud_nas_gui.py"
 EOF
 
 chmod +x "$APP_DIR/Contents/MacOS/Cloud NAS"
-echo "[OK] Installed 'Cloud NAS' with custom icon in macOS Applications & Launchpad!"
+echo "[OK] Installed 'Cloud NAS' with Python ($PYTHON_BIN) in macOS Applications & Launchpad!"
 
 # Auto-start GUI on macOS login
 PLIST_PATH="$HOME/Library/LaunchAgents/com.cloudnas.controlcenter.plist"
@@ -110,7 +116,7 @@ cat << EOF > "$PLIST_PATH"
     <string>com.cloudnas.controlcenter</string>
     <key>ProgramArguments</key>
     <array>
-        <string>/usr/bin/python3</string>
+        <string>$PYTHON_BIN</string>
         <string>$SCRIPT_DIR/cloud_nas_gui.py</string>
     </array>
     <key>RunAtLoad</key>
