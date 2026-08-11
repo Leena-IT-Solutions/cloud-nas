@@ -445,24 +445,31 @@ class CloudNASApp:
             else:
                 self.btn_tab_chat.config(text=chat_title, bg="#313244", fg="#cdd6f4")
 
+    def clear_content_frame(self):
+        if hasattr(self, "content_frame") and self.content_frame.winfo_exists():
+            for widget in list(self.content_frame.winfo_children()):
+                try:
+                    widget.destroy()
+                except Exception:
+                    pass
+            self.root.update_idletasks()
+
     def switch_to_dashboard(self):
         self.active_tab = "dashboard"
         self.btn_tab_dashboard.config(bg="#89b4fa", fg="#11111b")
         self.update_chat_tab_badge()
         if hasattr(self, "btn_tab_users"):
             self.btn_tab_users.config(bg="#313244", fg="#cdd6f4")
-        for widget in self.content_frame.winfo_children():
-            widget.destroy()
+        self.clear_content_frame()
         self.render_dashboard_tab()
 
     def switch_to_chat(self):
         self.active_tab = "chat"
         self.btn_tab_dashboard.config(bg="#313244", fg="#cdd6f4")
-        self.btn_tab_chat.config(bg="#a6e3a1", fg="#11111b")
+        self.update_chat_tab_badge()
         if hasattr(self, "btn_tab_users"):
             self.btn_tab_users.config(bg="#313244", fg="#cdd6f4")
-        for widget in self.content_frame.winfo_children():
-            widget.destroy()
+        self.clear_content_frame()
         self.render_chat_tab()
 
     def switch_to_users(self):
@@ -471,8 +478,7 @@ class CloudNASApp:
             self.btn_tab_users.config(bg="#cba6f7", fg="#11111b")
         self.btn_tab_dashboard.config(bg="#313244", fg="#cdd6f4")
         self.update_chat_tab_badge()
-        for widget in self.content_frame.winfo_children():
-            widget.destroy()
+        self.clear_content_frame()
         self.render_users_tab()
 
     # ==========================================
