@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """
 Cloud NAS Desktop Control Center & Live Monitor
-Provides real-time Upload/Download speeds, Transfer Queue, Push/Pull/Refresh buttons, and Drive Renaming.
+Provides real-time Upload/Download speeds, Transfer Queue, Push/Pull/Refresh buttons, Drive Renaming,
+and Real-time Live File Activity Logging (Additions, Modifications, Deletions).
 Pure Tkinter custom widgets for 100% reliable dark mode rendering on macOS & Windows.
 """
 
@@ -57,7 +58,7 @@ class CloudNASApp:
     def __init__(self, root):
         self.root = root
         self.root.title("Cloud NAS - Control Center & Bandwidth Monitor")
-        self.root.geometry("640x550")
+        self.root.geometry("640x560")
         self.root.minsize(580, 500)
         self.root.configure(bg="#181825")  # Dark Catppuccin Base
 
@@ -73,6 +74,7 @@ class CloudNASApp:
         # State Variables
         self.is_monitoring = True
         self.mounted = False
+        self.tracked_transfers = set()
 
         # Build UI Components
         self.create_header()
@@ -86,6 +88,10 @@ class CloudNASApp:
         self.poll_thread = threading.Thread(target=self.poll_stats_loop, daemon=True)
         self.poll_thread.start()
 
+        # Start Live File Activity Watcher (Add, Modify, Delete)
+        self.fs_thread = threading.Thread(target=self.fs_watcher_loop, daemon=True)
+        self.fs_thread.start()
+
     def get_current_drive_name(self):
         config_path = os.path.join(SCRIPT_DIR, "drive_config.json")
         if os.path.exists(config_path):
@@ -96,6 +102,63 @@ class CloudNASApp:
             except Exception:
                 pass
         return "Cloud NAS"
+
+    def get_mount_path(self):
+        vol_name = self.get_current_drive_name()
+        return os.path.join(os.path.expanduser("~"), vol_name)
+
+    def scan_mount_files(self, path):
+        file_map = {}
+        if not os.path.exists(path):
+            return file_map
+        try:
+            for root, dirs, files in os.walk(path):
+                for f in files:
+                    if f.startswith("."):  # Ignore system hidden files like .DS_Store
+                        continue
+                    full_path = os.path.join(root, f)
+                    try:
+                        stat = os.stat(full_path)
+                        rel_path = os.path.relpath(full_path, path)
+                        file_map[rel_path] = (stat.st_mtime, stat.st_size)
+                    except Exception:
+                        pass
+        except Exception:
+            pass
+        return file_map
+
+    def fs_watcher_loop(self):
+        """Monitors local mount drive for live file additions, modifications, and deletions."""
+        mount_path = self.get_mount_path()
+        last_files = self.scan_mount_files(mount_path)
+
+        while self.is_monitoring:
+            time.sleep(1.5)
+            current_path = self.get_mount_path()
+            if not os.path.exists(current_path):
+                last_files = {}
+                continue
+
+            current_files = self.scan_mount_files(current_path)
+
+            if last_files:
+                # Detect added files
+                for rel_p in current_files:
+                    if rel_p not in last_files:
+                        self.root.after(0, self.log, f"➕ File Added: {rel_p}")
+                    else:
+                        # Detect modified files
+                        old_mtime, old_size = last_files[rel_p]
+                        new_mtime, new_size = current_files[rel_p]
+                        if new_mtime > old_mtime or new_size != old_size:
+                            self.root.after(0, self.log, f"✏️ File Modified: {rel_p}")
+
+                # Detect deleted files
+                for rel_p in last_files:
+                    if rel_p not in current_files:
+                        self.root.after(0, self.log, f"🗑️ File Deleted: {rel_p}")
+
+            last_files = current_files
 
     def create_header(self):
         header_frame = tk.Frame(self.root, bg="#181825", padx=15, pady=10)
@@ -240,7 +303,7 @@ class CloudNASApp:
         log_header_frame = tk.Frame(console_frame, bg="#181825")
         log_header_frame.pack(fill="x", pady=(0, 4))
 
-        tk.Label(log_header_frame, text="📋 ACTIVITY LOG", bg="#181825", fg="#a6adc8", font=("Segoe UI", 9, "bold")).pack(side="left")
+        tk.Label(log_header_frame, text="📋 LIVE ACTIVITY & FILE LOG", bg="#181825", fg="#a6adc8", font=("Segoe UI", 9, "bold")).pack(side="left")
 
         btn_clear = DarkButton(
             log_header_frame,
@@ -262,7 +325,7 @@ class CloudNASApp:
             highlightbackground="#313244"
         )
         self.log_box.pack(fill="both", expand=True)
-        self.log("Cloud NAS Control Center initialized. Monitoring API...")
+        self.log("Cloud NAS Control Center initialized. Watching file activity...")
 
     def log(self, message):
         now = datetime.now().strftime("%H:%M:%S")
@@ -302,13 +365,17 @@ class CloudNASApp:
         self.up_speed_lbl.config(text=f"{speed_kb:.1f} KB/s")
         self.up_total_lbl.config(text=f"Total Uploaded: {mb_total:.2f} MB")
 
-        # Active Transfers Queue
+        # Active Transfers Queue & Log syncing files
         transfers = stats.get("transferring", [])
         if transfers:
             active_file = transfers[0].get("name", "Syncing...")
             pct = transfers[0].get("percentage", 0)
             self.active_file_lbl.config(text=f"Syncing: {active_file} ({pct}%)")
             self.set_progress(pct)
+
+            if active_file not in self.tracked_transfers:
+                self.tracked_transfers.add(active_file)
+                self.log(f"📤 Syncing Cloud File: {active_file}")
         else:
             self.active_file_lbl.config(text="Idle - All files fully synchronized")
             self.set_progress(100)
