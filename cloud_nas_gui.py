@@ -2,7 +2,7 @@
 """
 Cloud NAS Desktop Control Center & Live Monitor
 Provides real-time Upload/Download speeds, Transfer Queue, and Push/Pull/Refresh buttons.
-Works out of the box on macOS and Windows using standard Python Tkinter.
+Pure Tkinter widgets for 100% reliable dark mode on macOS & Windows.
 """
 
 import os
@@ -16,7 +16,7 @@ import subprocess
 import urllib.request
 import urllib.error
 import tkinter as tk
-from tkinter import ttk, messagebox
+from tkinter import messagebox
 from datetime import datetime
 
 # Enforce Single Instance using local socket lock
@@ -38,7 +38,7 @@ class CloudNASApp:
         self.root.title("Cloud NAS - Control Center & Bandwidth Monitor")
         self.root.geometry("640x520")
         self.root.minsize(580, 480)
-        self.root.configure(bg="#181825")  # Mocha Dark Theme
+        self.root.configure(bg="#181825")  # Dark Catppuccin Base
 
         # Apply Window Icon if available
         icon_path = os.path.join(SCRIPT_DIR, "app_icon.png")
@@ -48,9 +48,6 @@ class CloudNASApp:
                 self.root.iconphoto(True, img)
             except Exception:
                 pass
-
-        # Apply custom dark theme styles
-        self.setup_styles()
 
         # State Variables
         self.is_monitoring = True
@@ -67,30 +64,17 @@ class CloudNASApp:
         self.poll_thread = threading.Thread(target=self.poll_stats_loop, daemon=True)
         self.poll_thread.start()
 
-    def setup_styles(self):
-        style = ttk.Style()
-        style.theme_use("clam")
-        
-        # Frame styles
-        style.configure("TFrame", background="#181825")
-        style.configure("Card.TFrame", background="#1e1e2e", relief="flat", borderwidth=1)
-
-        # Label styles
-        style.configure("Header.TLabel", background="#181825", foreground="#cdd6f4", font=("Segoe UI", 14, "bold"))
-        style.configure("SubHeader.TLabel", background="#181825", foreground="#a6adc8", font=("Segoe UI", 9))
-        style.configure("CardTitle.TLabel", background="#1e1e2e", foreground="#a6adc8", font=("Segoe UI", 9, "bold"))
-        style.configure("Speed.TLabel", background="#1e1e2e", foreground="#a6e3a1", font=("Segoe UI", 18, "bold"))
-        style.configure("DownloadSpeed.TLabel", background="#1e1e2e", foreground="#89b4fa", font=("Segoe UI", 18, "bold"))
-        style.configure("Stat.TLabel", background="#1e1e2e", foreground="#bac2de", font=("Segoe UI", 9))
-
-        # Progressbar
-        style.configure("Horizontal.TProgressbar", background="#89b4fa", troughcolor="#313244", borderwidth=0)
-
     def create_header(self):
-        header_frame = ttk.Frame(self.root, padding=(15, 12, 15, 5))
+        header_frame = tk.Frame(self.root, bg="#181825", padx=15, pady=12)
         header_frame.pack(fill="x")
 
-        title_label = ttk.Label(header_frame, text="☁️ Cloud NAS Control Center", style="Header.TLabel")
+        title_label = tk.Label(
+            header_frame, 
+            text="☁️ Cloud NAS Control Center", 
+            bg="#181825", 
+            fg="#cdd6f4", 
+            font=("Segoe UI", 14, "bold")
+        )
         title_label.pack(side="left")
 
         self.status_badge = tk.Label(
@@ -106,43 +90,52 @@ class CloudNASApp:
         self.status_badge.pack(side="right")
 
     def create_speed_cards(self):
-        cards_frame = ttk.Frame(self.root, padding=(15, 5, 15, 10))
+        cards_frame = tk.Frame(self.root, bg="#181825", padx=15, pady=5)
         cards_frame.pack(fill="x")
 
         # Upload Speed Card
-        up_card = ttk.Frame(cards_frame, style="Card.TFrame", padding=12)
+        up_card = tk.Frame(cards_frame, bg="#1e1e2e", padx=14, pady=12, highlightthickness=1, highlightbackground="#313244")
         up_card.pack(side="left", fill="both", expand=True, padx=(0, 7))
 
-        ttk.Label(up_card, text="⬆️ UPLOAD SPEED", style="CardTitle.TLabel").pack(anchor="w")
-        self.up_speed_lbl = ttk.Label(up_card, text="0.0 KB/s", style="Speed.TLabel")
+        tk.Label(up_card, text="⬆️ UPLOAD SPEED", bg="#1e1e2e", fg="#a6adc8", font=("Segoe UI", 9, "bold")).pack(anchor="w")
+        self.up_speed_lbl = tk.Label(up_card, text="0.0 KB/s", bg="#1e1e2e", fg="#a6e3a1", font=("Segoe UI", 18, "bold"))
         self.up_speed_lbl.pack(anchor="w", pady=(2, 0))
-        self.up_total_lbl = ttk.Label(up_card, text="Total Uploaded: 0 MB", style="Stat.TLabel")
+        self.up_total_lbl = tk.Label(up_card, text="Total Uploaded: 0 MB", bg="#1e1e2e", fg="#bac2de", font=("Segoe UI", 9))
         self.up_total_lbl.pack(anchor="w")
 
         # Download Speed Card
-        down_card = ttk.Frame(cards_frame, style="Card.TFrame", padding=12)
+        down_card = tk.Frame(cards_frame, bg="#1e1e2e", padx=14, pady=12, highlightthickness=1, highlightbackground="#313244")
         down_card.pack(side="right", fill="both", expand=True, padx=(7, 0))
 
-        ttk.Label(down_card, text="⬇️ DOWNLOAD SPEED", style="CardTitle.TLabel").pack(anchor="w")
-        self.down_speed_lbl = ttk.Label(down_card, text="0.0 KB/s", style="DownloadSpeed.TLabel")
+        tk.Label(down_card, text="⬇️ DOWNLOAD SPEED", bg="#1e1e2e", fg="#a6adc8", font=("Segoe UI", 9, "bold")).pack(anchor="w")
+        self.down_speed_lbl = tk.Label(down_card, text="0.0 KB/s", bg="#1e1e2e", fg="#89b4fa", font=("Segoe UI", 18, "bold"))
         self.down_speed_lbl.pack(anchor="w", pady=(2, 0))
-        self.down_total_lbl = ttk.Label(down_card, text="Total Downloaded: 0 MB", style="Stat.TLabel")
+        self.down_total_lbl = tk.Label(down_card, text="Total Downloaded: 0 MB", bg="#1e1e2e", fg="#bac2de", font=("Segoe UI", 9))
         self.down_total_lbl.pack(anchor="w")
 
     def create_transfer_queue(self):
-        queue_frame = ttk.Frame(self.root, style="Card.TFrame", padding=10)
-        queue_frame.pack(fill="x", padx=15, pady=(0, 10))
+        queue_frame = tk.Frame(self.root, bg="#1e1e2e", padx=12, pady=10, highlightthickness=1, highlightbackground="#313244")
+        queue_frame.pack(fill="x", padx=15, pady=(5, 10))
 
-        ttk.Label(queue_frame, text="⚡ ACTIVE TRANSFERS", style="CardTitle.TLabel").pack(anchor="w", pady=(0, 4))
+        tk.Label(queue_frame, text="⚡ ACTIVE TRANSFERS", bg="#1e1e2e", fg="#a6adc8", font=("Segoe UI", 9, "bold")).pack(anchor="w", pady=(0, 4))
         
         self.active_file_lbl = tk.Label(queue_frame, text="No active file transfers", bg="#1e1e2e", fg="#cdd6f4", font=("Segoe UI", 9), anchor="w")
         self.active_file_lbl.pack(fill="x")
 
-        self.progress_bar = ttk.Progressbar(queue_frame, style="Horizontal.TProgressbar", mode="determinate")
-        self.progress_bar.pack(fill="x", pady=(5, 0))
+        # Custom canvas progress bar for guaranteed dark theme rendering
+        self.progress_canvas = tk.Canvas(queue_frame, bg="#313244", height=8, highlightthickness=0)
+        self.progress_canvas.pack(fill="x", pady=(6, 0))
+        self.progress_rect = self.progress_canvas.create_rectangle(0, 0, 0, 8, fill="#89b4fa", width=0)
+
+    def set_progress(self, percentage):
+        w = self.progress_canvas.winfo_width()
+        if w <= 1:
+            w = 580
+        target_w = int((percentage / 100.0) * w)
+        self.progress_canvas.coords(self.progress_rect, 0, 0, target_w, 8)
 
     def create_action_toolbar(self):
-        toolbar_frame = ttk.Frame(self.root, padding=(15, 0, 15, 10))
+        toolbar_frame = tk.Frame(self.root, bg="#181825", padx=15, pady=5)
         toolbar_frame.pack(fill="x")
 
         # Refresh Button
@@ -176,7 +169,7 @@ class CloudNASApp:
         btn_pull.pack(side="left")
 
     def create_log_console(self):
-        console_frame = ttk.Frame(self.root, padding=(15, 0, 15, 15))
+        console_frame = tk.Frame(self.root, bg="#181825", padx=15, pady=10)
         console_frame.pack(fill="both", expand=True)
 
         tk.Label(console_frame, text="📋 ACTIVITY LOG", bg="#181825", fg="#a6adc8", font=("Segoe UI", 9, "bold")).pack(anchor="w", pady=(0, 3))
@@ -186,7 +179,7 @@ class CloudNASApp:
             bg="#1e1e2e", 
             fg="#a6adc8", 
             insertbackground="#cdd6f4", 
-            font=("Consolas", 8),
+            font=("Consolas", 9),
             relief="flat", 
             highlightthickness=1, 
             highlightbackground="#313244"
@@ -238,17 +231,17 @@ class CloudNASApp:
             active_file = transfers[0].get("name", "Syncing...")
             pct = transfers[0].get("percentage", 0)
             self.active_file_lbl.config(text=f"Syncing: {active_file} ({pct}%)")
-            self.progress_bar["value"] = pct
+            self.set_progress(pct)
         else:
             self.active_file_lbl.config(text="Idle - All files fully synchronized")
-            self.progress_bar["value"] = 100
+            self.set_progress(100)
 
     def update_ui_disconnected(self):
         self.status_badge.config(text="● DISCONNECTED / UNMOUNTED", bg="#f38ba8", fg="#11111b")
         self.up_speed_lbl.config(text="0.0 KB/s")
         self.down_speed_lbl.config(text="0.0 KB/s")
         self.active_file_lbl.config(text="Cloud NAS is not currently mounted.")
-        self.progress_bar["value"] = 0
+        self.set_progress(0)
 
     def action_refresh_data(self):
         def _task():
