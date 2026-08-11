@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-# macOS Cloud NAS Auto-Mount Script
+# macOS Cloud NAS Auto-Mount Script with User Permission & Folder Scoping
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 RCLONE_BIN="$SCRIPT_DIR/rclone"
 
@@ -10,9 +10,9 @@ if [ ! -f "$RCLONE_BIN" ]; then
 fi
 
 CONFIG_FILE="$SCRIPT_DIR/drive_config.json"
-VOL_NAME="Cloud NAS"
+ACTIVE_USER_FILE="$SCRIPT_DIR/active_user_mount.json"
 
-# Read custom drive name from drive_config.json if present
+VOL_NAME="Cloud NAS"
 if [ -f "$CONFIG_FILE" ]; then
     PARSED_NAME="$(grep -o '"volname": "[^"]*"' "$CONFIG_FILE" | cut -d'"' -f4)"
     if [ -n "$PARSED_NAME" ]; then
@@ -20,9 +20,25 @@ if [ -f "$CONFIG_FILE" ]; then
     fi
 fi
 
-BUCKET_NAME="sv-school"            # GCP Bucket Name
-REMOTE_NAME="gcsnas"              # Rclone remote name
-MOUNT_POINT="$HOME/$VOL_NAME"      # Local mount directory in macOS Finder
+BUCKET_NAME="sv-school"
+REMOTE_NAME="gcsnas"
+REMOTE_PATH="$REMOTE_NAME:$BUCKET_NAME"
+READ_ONLY_FLAG=""
+
+# Check Active User Folder Scope & Permission Level
+if [ -f "$ACTIVE_USER_FILE" ]; then
+    SUBPATH="$(grep -o '"folder_path": "[^"]*"' "$ACTIVE_USER_FILE" | cut -d'"' -f4 | sed 's/^\///')"
+    PERM="$(grep -o '"permission": "[^"]*"' "$ACTIVE_USER_FILE" | cut -d'"' -f4)"
+
+    if [ -n "$SUBPATH" ] && [ "$SUBPATH" != "/" ]; then
+        REMOTE_PATH="$REMOTE_NAME:$BUCKET_NAME/$SUBPATH"
+    fi
+    if [ "$PERM" = "Read-Only" ]; then
+        READ_ONLY_FLAG="--read-only"
+    fi
+fi
+
+MOUNT_POINT="$HOME/$VOL_NAME"
 
 # Unmount existing instance if running
 pkill -9 -f "rclone mount" >/dev/null 2>&1
@@ -34,9 +50,9 @@ fi
 # Create fresh mount directory
 mkdir -p "$MOUNT_POINT"
 
-echo "Mounting Google Cloud Storage Bucket '$BUCKET_NAME' to '$MOUNT_POINT' (Volume: '$VOL_NAME')..."
+echo "Mounting '$REMOTE_PATH' to '$MOUNT_POINT' (Volume: '$VOL_NAME')..."
 
-nohup "$RCLONE_BIN" mount "$REMOTE_NAME:$BUCKET_NAME" "$MOUNT_POINT" \
+nohup "$RCLONE_BIN" mount "$REMOTE_PATH" "$MOUNT_POINT" \
     --vfs-cache-mode full \
     --vfs-cache-max-size 10G \
     --vfs-cache-max-age 24h \
@@ -49,6 +65,7 @@ nohup "$RCLONE_BIN" mount "$REMOTE_NAME:$BUCKET_NAME" "$MOUNT_POINT" \
     --rc \
     --rc-no-auth \
     --rc-addr 127.0.0.1:5572 \
-    --no-modtime >/dev/null 2>&1 &
+    --no-modtime \
+    $READ_ONLY_FLAG >/dev/null 2>&1 &
 
 echo "Cloud NAS mounted successfully at '$MOUNT_POINT'!"

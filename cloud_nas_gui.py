@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """
 Cloud NAS Desktop Control Center & Live Monitor
-Provides Admin Authentication (admin/password), Folder-Level Access & User Permissions Management,
-real-time Upload/Download speeds, Transfer Queue, Push/Pull/Refresh buttons, Drive Renaming, and Live File Activity Logging.
+Provides Admin Authentication, Folder-Level Scoping & Permission Enforcement, Real-time Speeds,
+Transfer Queue, Push/Pull/Refresh buttons, Drive Renaming, and Live File Activity Logging.
 Pure Tkinter custom widgets for 100% reliable dark mode rendering on macOS & Windows.
 """
 
@@ -99,6 +99,15 @@ class CloudNASApp:
                         "created_at": datetime.now().strftime("%Y-%m-%d %H:%M")
                     },
                     {
+                        "username": "philip",
+                        "password": "password",
+                        "role": "User",
+                        "folder_scope": "Specific Folder",
+                        "folder_path": "/Philip",
+                        "permission": "Read-Write",
+                        "created_at": datetime.now().strftime("%Y-%m-%d %H:%M")
+                    },
+                    {
                         "username": "Sandeep Rathod",
                         "password": "password",
                         "role": "User",
@@ -150,7 +159,7 @@ class CloudNASApp:
         card.pack()
 
         tk.Label(card, text="☁️ Cloud NAS Control Center", bg="#1e1e2e", fg="#cdd6f4", font=("Segoe UI", 16, "bold")).pack(pady=(0, 5))
-        tk.Label(card, text="🔐 Administrator Authentication Required", bg="#1e1e2e", fg="#a6adc8", font=("Segoe UI", 9)).pack(pady=(0, 20))
+        tk.Label(card, text="🔐 User & Admin Authentication Required", bg="#1e1e2e", fg="#a6adc8", font=("Segoe UI", 9)).pack(pady=(0, 20))
 
         # Username Input
         tk.Label(card, text="Username:", bg="#1e1e2e", fg="#bac2de", font=("Segoe UI", 9, "bold")).pack(anchor="w", pady=(0, 2))
@@ -187,13 +196,44 @@ class CloudNASApp:
         p_input = self.login_pass_entry.get().strip()
 
         for u in self.users_data.get("users", []):
-            if u["username"] == u_input and u["password"] == p_input:
+            if u["username"].lower() == u_input.lower() and u["password"] == p_input:
                 self.logged_in_user = u
                 self.root.unbind("<Return>")
+
+                # Save Active User Mount Config
+                active_user_file = os.path.join(SCRIPT_DIR, "active_user_mount.json")
+                try:
+                    with open(active_user_file, "w") as f:
+                        json.dump(u, f, indent=2)
+                except Exception as e:
+                    print(f"Error saving active user file: {e}")
+
+                # Remount Cloud NAS drive for this user's folder scope & permissions
+                self.remount_for_active_user(u)
+
                 self.show_main_app()
                 return
 
         self.login_err_lbl.config(text="❌ Invalid Username or Password")
+
+    def remount_for_active_user(self, user):
+        def _remount():
+            folder = user.get("folder_path", "/")
+            perm = user.get("permission", "Read-Write")
+            uname = user.get("username", "User")
+            
+            print(f"Remounting Cloud NAS for user '{uname}' (Folder: '{folder}', Perm: '{perm}')...")
+            if IS_MAC:
+                mount_script = os.path.join(SCRIPT_DIR, "mac-mount.sh")
+                subprocess.run(["bash", mount_script], capture_output=True)
+            elif IS_WIN:
+                mount_script = os.path.join(SCRIPT_DIR, "windows-mount-hidden.vbs")
+                subprocess.run(["cscript", "//nologo", mount_script], capture_output=True)
+            
+            if hasattr(self, "log_box"):
+                self.log(f"🔐 Logged in as '{uname}'. Folder scope: '{folder}' ({perm}). Drive remounted!")
+
+        threading.Thread(target=_remount, daemon=True).start()
 
     # ==========================================
     # 🎛️ MAIN APPLICATION DASHBOARD VIEW
@@ -239,6 +279,17 @@ class CloudNASApp:
         right_panel = tk.Frame(header_frame, bg="#181825")
         right_panel.pack(side="right")
 
+        user_disp = self.logged_in_user.get("username", "User") if self.logged_in_user else "User"
+        folder_disp = self.logged_in_user.get("folder_path", "/") if self.logged_in_user else "/"
+        
+        tk.Label(
+            right_panel, 
+            text=f"👤 {user_disp} ({folder_disp})", 
+            bg="#181825", 
+            fg="#89b4fa", 
+            font=("Segoe UI", 9, "bold")
+        ).pack(side="left", padx=(0, 10))
+
         self.status_badge = tk.Label(
             right_panel, 
             text="● CONNECTING...", 
@@ -258,6 +309,24 @@ class CloudNASApp:
         btn_logout.pack(side="left")
 
     def handle_logout(self):
+        active_user_file = os.path.join(SCRIPT_DIR, "active_user_mount.json")
+        if os.path.exists(active_user_file):
+            try:
+                os.remove(active_user_file)
+            except Exception:
+                pass
+        
+        # Remount root drive on logout
+        def _remount_root():
+            if IS_MAC:
+                mount_script = os.path.join(SCRIPT_DIR, "mac-mount.sh")
+                subprocess.run(["bash", mount_script], capture_output=True)
+            elif IS_WIN:
+                mount_script = os.path.join(SCRIPT_DIR, "windows-mount-hidden.vbs")
+                subprocess.run(["cscript", "//nologo", mount_script], capture_output=True)
+
+        threading.Thread(target=_remount_root, daemon=True).start()
+
         self.logged_in_user = None
         self.show_login_screen()
 
@@ -271,23 +340,28 @@ class CloudNASApp:
         )
         self.btn_tab_dashboard.pack(side="left", padx=(0, 6))
 
-        self.btn_tab_users = DarkButton(
-            tab_frame, text="👥 Users & Permissions", command=self.switch_to_users,
-            bg="#313244", fg="#cdd6f4", hover_bg="#45475a", font=("Segoe UI", 9, "bold"), padx=14, pady=5
-        )
-        self.btn_tab_users.pack(side="left")
+        # Show Users & Permissions tab if Admin or Full Access
+        is_admin = self.logged_in_user and (self.logged_in_user.get("role") == "Admin" or self.logged_in_user.get("username") == "admin")
+        if is_admin:
+            self.btn_tab_users = DarkButton(
+                tab_frame, text="👥 Users & Permissions", command=self.switch_to_users,
+                bg="#313244", fg="#cdd6f4", hover_bg="#45475a", font=("Segoe UI", 9, "bold"), padx=14, pady=5
+            )
+            self.btn_tab_users.pack(side="left")
 
     def switch_to_dashboard(self):
         self.active_tab = "dashboard"
         self.btn_tab_dashboard.config(bg="#89b4fa", fg="#11111b")
-        self.btn_tab_users.config(bg="#313244", fg="#cdd6f4")
+        if hasattr(self, "btn_tab_users"):
+            self.btn_tab_users.config(bg="#313244", fg="#cdd6f4")
         for widget in self.content_frame.winfo_children():
             widget.destroy()
         self.render_dashboard_tab()
 
     def switch_to_users(self):
         self.active_tab = "users"
-        self.btn_tab_users.config(bg="#cba6f7", fg="#11111b")
+        if hasattr(self, "btn_tab_users"):
+            self.btn_tab_users.config(bg="#cba6f7", fg="#11111b")
         self.btn_tab_dashboard.config(bg="#313244", fg="#cdd6f4")
         for widget in self.content_frame.winfo_children():
             widget.destroy()
@@ -397,7 +471,7 @@ class CloudNASApp:
 
         self.drive_name_entry = tk.Entry(
             settings_frame, bg="#181825", fg="#cdd6f4", insertbackground="#cdd6f4",
-            font=("Segoe UI", 9, "bold"), relief="flat", highlightthickness=1, highlightbackground="#313244", width=20
+            font=("Segoe UI", 9, "bold"), relief="flat", highlightthickness=1, highlightbackground="#313244", width=18
         )
         self.drive_name_entry.insert(0, self.get_current_drive_name())
         self.drive_name_entry.pack(side="left", padx=(0, 8))
@@ -407,6 +481,16 @@ class CloudNASApp:
             bg="#f9e2af", fg="#11111b", hover_bg="#fae3b0", font=("Segoe UI", 8, "bold"), padx=10, pady=4
         )
         btn_rename.pack(side="left")
+
+        # Active Folder Scope Badge
+        user_folder = self.logged_in_user.get("folder_path", "/") if self.logged_in_user else "/"
+        user_perm = self.logged_in_user.get("permission", "Read-Write") if self.logged_in_user else "Read-Write"
+        scope_badge = f"🔒 Scope: {user_folder} ({user_perm})"
+        
+        tk.Label(
+            settings_frame, text=scope_badge, bg="#1e1e2e", fg="#a6e3a1" if "Write" in user_perm else "#f9e2af",
+            font=("Segoe UI", 8, "bold")
+        ).pack(side="right")
 
     def create_speed_cards(self):
         cards_frame = tk.Frame(self.content_frame, bg="#181825", padx=15, pady=5)
@@ -494,7 +578,11 @@ class CloudNASApp:
             font=("Consolas", 9), relief="flat", highlightthickness=1, highlightbackground="#313244"
         )
         self.log_box.pack(fill="both", expand=True)
-        self.log("Cloud NAS Control Center initialized. Watching file activity...")
+        
+        user_disp = self.logged_in_user.get("username", "User") if self.logged_in_user else "User"
+        user_folder = self.logged_in_user.get("folder_path", "/") if self.logged_in_user else "/"
+        user_perm = self.logged_in_user.get("permission", "Read-Write") if self.logged_in_user else "Read-Write"
+        self.log(f"Cloud NAS initialized for '{user_disp}'. Scoped to folder '{user_folder}' ({user_perm}).")
 
     def log(self, message):
         if hasattr(self, "log_box"):
@@ -543,7 +631,7 @@ class CloudNASApp:
         tk.Label(col_scope, text="Folder Access Scope:", bg="#1e1e2e", fg="#a6adc8", font=("Segoe UI", 8, "bold")).pack(anchor="w")
         
         self.scope_var = tk.StringVar(value="Full Access (All Folders)")
-        scope_opt = tk.OptionMenu(col_scope, self.scope_var, "Full Access (All Folders)", "Specific Folder Only", command=self.on_scope_change)
+        scope_opt = tk.OptionMenu(col_scope, self.scope_var, "Full Access (All Folders)", "Specific Folder", command=self.on_scope_change)
         scope_opt.config(bg="#181825", fg="#cdd6f4", activebackground="#313244", font=("Segoe UI", 8), highlightthickness=0)
         scope_opt["menu"].config(bg="#1e1e2e", fg="#cdd6f4")
         scope_opt.pack()
@@ -586,7 +674,7 @@ class CloudNASApp:
         else:
             if self.new_folder_entry.get() == "/":
                 self.new_folder_entry.delete(0, "end")
-                self.new_folder_entry.insert(0, "/Projects")
+                self.new_folder_entry.insert(0, "/Philip")
 
     def render_users_table(self):
         for widget in self.users_list_frame.winfo_children():
@@ -649,7 +737,7 @@ class CloudNASApp:
 
         # Check duplicate
         for u in self.users_data.get("users", []):
-            if u["username"] == uname:
+            if u["username"].lower() == uname.lower():
                 return
 
         new_u = {
@@ -670,7 +758,7 @@ class CloudNASApp:
         self.render_users_table()
 
     def handle_delete_user(self, username):
-        self.users_data["users"] = [u for u in self.users_data.get("users", []) if u["username"] != username]
+        self.users_data["users"] = [u for u in self.users_data.get("users", []) if u["username"].lower() != username.lower()]
         self.save_users_data()
         self.render_users_table()
 

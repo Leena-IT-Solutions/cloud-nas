@@ -14,13 +14,29 @@ if [ -z "$PYTHON_BIN" ]; then
 fi
 
 CONFIG_FILE="$SCRIPT_DIR/drive_config.json"
-VOL_NAME="Cloud NAS"
+ACTIVE_USER_FILE="$SCRIPT_DIR/active_user_mount.json"
 
-# Read custom drive name from drive_config.json if present
+VOL_NAME="Cloud NAS"
 if [ -f "$CONFIG_FILE" ]; then
     PARSED_NAME="$(grep -o '"volname": "[^"]*"' "$CONFIG_FILE" | cut -d'"' -f4)"
     if [ -n "$PARSED_NAME" ]; then
         VOL_NAME="$PARSED_NAME"
+    fi
+fi
+
+REMOTE_PATH="$REMOTE_NAME:$BUCKET_NAME"
+READ_ONLY_FLAG=""
+
+# Check Active User Folder Scope & Permission Level
+if [ -f "$ACTIVE_USER_FILE" ]; then
+    SUBPATH="$(grep -o '"folder_path": "[^"]*"' "$ACTIVE_USER_FILE" | cut -d'"' -f4 | sed 's/^\///')"
+    PERM="$(grep -o '"permission": "[^"]*"' "$ACTIVE_USER_FILE" | cut -d'"' -f4)"
+
+    if [ -n "$SUBPATH" ] && [ "$SUBPATH" != "/" ]; then
+        REMOTE_PATH="$REMOTE_NAME:$BUCKET_NAME/$SUBPATH"
+    fi
+    if [ "$PERM" = "Read-Only" ]; then
+        READ_ONLY_FLAG="--read-only"
     fi
 fi
 
@@ -64,7 +80,7 @@ fi
 mkdir -p "$MOUNT_POINT"
 
 # Launch rclone in background via nohup
-nohup "$RCLONE_BIN" mount "$REMOTE_NAME:$BUCKET_NAME" "$MOUNT_POINT" \
+nohup "$RCLONE_BIN" mount "$REMOTE_PATH" "$MOUNT_POINT" \
     --vfs-cache-mode full \
     --vfs-cache-max-size 10G \
     --vfs-cache-max-age 24h \
@@ -77,7 +93,8 @@ nohup "$RCLONE_BIN" mount "$REMOTE_NAME:$BUCKET_NAME" "$MOUNT_POINT" \
     --rc \
     --rc-no-auth \
     --rc-addr 127.0.0.1:5572 \
-    --no-modtime >/dev/null 2>&1 &
+    --no-modtime \
+    $READ_ONLY_FLAG >/dev/null 2>&1 &
 
 sleep 1
 
