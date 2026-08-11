@@ -835,19 +835,28 @@ class CloudNASApp:
 
         self.render_contacts_list()
 
-        # Auto-select first contact if none selected
-        current_u = self.logged_in_user.get("username", "").lower()
+        # Auto-select contact robustly with case-insensitive matching
+        current_u = self.logged_in_user.get("username", "").lower() if self.logged_in_user else ""
         other_users = [u["username"] for u in self.users_data.get("users", []) if u["username"].lower() != current_u]
-        if other_users and not self.active_chat_recipient:
-            self.select_chat_contact(other_users[0])
-        elif self.active_chat_recipient:
-            self.select_chat_contact(self.active_chat_recipient)
+
+        target_contact = None
+        if self.active_chat_recipient:
+            for u_name in other_users:
+                if u_name.lower() == self.active_chat_recipient.lower():
+                    target_contact = u_name
+                    break
+
+        if not target_contact and other_users:
+            target_contact = other_users[0]
+
+        if target_contact:
+            self.select_chat_contact(target_contact)
 
     def render_contacts_list(self):
         for widget in self.contacts_list_frame.winfo_children():
             widget.destroy()
 
-        current_u = self.logged_in_user.get("username", "").lower()
+        current_u = self.logged_in_user.get("username", "").lower() if self.logged_in_user else ""
         other_users = [u["username"] for u in self.users_data.get("users", []) if u["username"].lower() != current_u]
 
         for u_name in other_users:
@@ -855,7 +864,7 @@ class CloudNASApp:
             badge = f" 🔴 ({unread})" if unread > 0 else ""
             display_text = f"👤 {u_name}{badge}"
             
-            is_active = (self.active_chat_recipient == u_name)
+            is_active = (self.active_chat_recipient and self.active_chat_recipient.lower() == u_name.lower())
             btn_bg = "#313244" if is_active else "#181825"
             btn_fg = "#a6e3a1" if is_active else "#cdd6f4"
 
