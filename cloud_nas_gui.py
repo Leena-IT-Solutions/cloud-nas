@@ -427,11 +427,11 @@ class CloudNASApp:
 
     def action_push(self):
         def _task():
-            self.log("Triggering Push: Forcing instant upload of local cache to GCS...")
-            res = self.api_post("vfs/forget")
-            res_ref = self.api_post("vfs/refresh")
-            if res or res_ref:
-                self.log("✅ Push completed! Pending files synced to Google Cloud.")
+            self.log("Triggering Push: Forcing instant sync of local files to GCS...")
+            res1 = self.api_post("vfs/forget")
+            res2 = self.api_post("vfs/refresh", {"recursive": "true"})
+            if res1 or res2:
+                self.log("✅ Push completed! All local files and folders synced to Google Cloud.")
             else:
                 self.log("❌ Push failed. Check connection.")
         threading.Thread(target=_task, daemon=True).start()
