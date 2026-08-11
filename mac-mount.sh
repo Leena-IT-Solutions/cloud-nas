@@ -32,6 +32,7 @@ if [ -f "$ACTIVE_USER_FILE" ]; then
 
     if [ -n "$SUBPATH" ] && [ "$SUBPATH" != "/" ]; then
         "$RCLONE_BIN" touch "$REMOTE_NAME:$BUCKET_NAME/$SUBPATH/.keep" >/dev/null 2>&1
+        "$RCLONE_BIN" touch "$REMOTE_NAME:$BUCKET_NAME/.sys/chats/.keep" >/dev/null 2>&1
         REMOTE_PATH="$REMOTE_NAME:$BUCKET_NAME/$SUBPATH"
     fi
     if [ "$PERM" = "Read-Only" ]; then

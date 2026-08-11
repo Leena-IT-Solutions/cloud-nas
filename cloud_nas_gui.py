@@ -113,9 +113,9 @@ class CloudNASApp:
         if not os.path.exists(rclone_bin):
             rclone_bin = "rclone"
 
-        # 1. Fetch live user database from Google Cloud Storage remote
+        # 1. Fetch live user database from Google Cloud Storage remote with isolated cache dir
         try:
-            res = subprocess.run([rclone_bin, "cat", remote_target], capture_output=True, text=True, timeout=5)
+            res = subprocess.run([rclone_bin, "cat", remote_target, "--cache-dir", "/tmp/rclone_chat_cache"], capture_output=True, text=True, timeout=5)
             if res.returncode == 0 and res.stdout.strip():
                 data = json.loads(res.stdout)
                 if "users" in data and len(data["users"]) > 0:
@@ -201,7 +201,7 @@ class CloudNASApp:
                 rclone_bin = "rclone"
             remote_target = "gcsnas:sv-school/.sys/users_permissions.json"
             try:
-                subprocess.run([rclone_bin, "copyto", USERS_FILE, remote_target], capture_output=True, timeout=10)
+                subprocess.run([rclone_bin, "copyto", USERS_FILE, remote_target, "--cache-dir", "/tmp/rclone_chat_cache"], capture_output=True, timeout=10)
                 print(f"✅ User permissions database synced to GCS Cloud Storage remote: {remote_target}")
             except Exception as e:
                 print(f"Failed to sync users database to GCS: {e}")
@@ -704,7 +704,7 @@ class CloudNASApp:
             rclone_bin = "rclone"
 
         try:
-            res = subprocess.run([rclone_bin, "cat", remote_target], capture_output=True, text=True, timeout=4)
+            res = subprocess.run([rclone_bin, "cat", remote_target, "--cache-dir", "/tmp/rclone_chat_cache"], capture_output=True, text=True, timeout=5)
             if res.returncode == 0 and res.stdout.strip():
                 data = json.loads(res.stdout)
                 return data.get("messages", [])
@@ -719,35 +719,42 @@ class CloudNASApp:
         sender = self.logged_in_user.get("username", "User")
         chat_file = self.get_chat_filename(sender, recipient_username)
         remote_target = f"gcsnas:sv-school/.sys/chats/{chat_file}"
-        
-        history = self.fetch_chat_history(sender, recipient_username)
-        new_msg = {
-            "sender": sender,
-            "recipient": recipient_username,
-            "text": text.strip(),
-            "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        }
-        history.append(new_msg)
-        
-        tmp_local = os.path.join(SCRIPT_DIR, f"temp_{chat_file}")
-        try:
-            with open(tmp_local, "w") as f:
-                json.dump({"messages": history}, f, indent=2)
+        tstamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+        # Optimistically insert message into UI immediately
+        if hasattr(self, "chat_msg_box") and self.chat_msg_box.winfo_exists():
+            self.chat_msg_box.config(state="normal")
+            self.chat_msg_box.insert("end", f"[{tstamp}] You: ", "sent")
+            self.chat_msg_box.insert("end", f"{text.strip()}\n")
+            self.chat_msg_box.see("end")
+            self.chat_msg_box.config(state="disabled")
+
+        def _async_send():
+            history = self.fetch_chat_history(sender, recipient_username)
+            new_msg = {
+                "sender": sender,
+                "recipient": recipient_username,
+                "text": text.strip(),
+                "timestamp": tstamp
+            }
+            history.append(new_msg)
             
-            rclone_bin = os.path.join(SCRIPT_DIR, "rclone")
-            if not os.path.exists(rclone_bin):
-                rclone_bin = "rclone"
-            
-            def _push():
-                subprocess.run([rclone_bin, "copyto", tmp_local, remote_target], capture_output=True, timeout=8)
+            tmp_local = os.path.join(SCRIPT_DIR, f"temp_{chat_file}")
+            try:
+                with open(tmp_local, "w") as f:
+                    json.dump({"messages": history}, f, indent=2)
+                
+                rclone_bin = os.path.join(SCRIPT_DIR, "rclone")
+                if not os.path.exists(rclone_bin):
+                    rclone_bin = "rclone"
+                
+                subprocess.run([rclone_bin, "copyto", tmp_local, remote_target, "--cache-dir", "/tmp/rclone_chat_cache"], capture_output=True, timeout=8)
                 if os.path.exists(tmp_local):
                     os.remove(tmp_local)
-                if self.active_tab == "chat" and self.active_chat_recipient == recipient_username:
-                    self.root.after(0, self.load_active_chat_messages)
+            except Exception as e:
+                print(f"Error sending chat message: {e}")
 
-            threading.Thread(target=_push, daemon=True).start()
-        except Exception as e:
-            print(f"Error sending chat message: {e}")
+        threading.Thread(target=_async_send, daemon=True).start()
 
     def send_desktop_notification(self, title, message):
         """Triggers native desktop popups on macOS & Windows."""
