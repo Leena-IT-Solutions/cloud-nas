@@ -30,10 +30,18 @@ except Exception:
 # Enforce Single Instance using local socket lock
 try:
     single_instance_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    single_instance_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
     single_instance_socket.bind(('127.0.0.1', 5573))
 except socket.error:
-    print("Cloud NAS Control Center is already running.")
-    sys.exit(0)
+    # Terminate stale background process to ensure fresh GUI window opens
+    subprocess.run(["pkill", "-9", "-f", "cloud_nas_gui.py"], capture_output=True)
+    time.sleep(0.5)
+    try:
+        single_instance_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        single_instance_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        single_instance_socket.bind(('127.0.0.1', 5573))
+    except Exception:
+        pass
 
 RC_URL = "http://127.0.0.1:5572"
 IS_MAC = platform.system() == "Darwin"
@@ -74,6 +82,14 @@ class CloudNASApp:
         self.root.geometry("740x660")
         self.root.minsize(700, 560)
         self.root.configure(bg="#181825")  # Dark Catppuccin Base
+
+        # Bring window to front
+        try:
+            self.root.lift()
+            self.root.attributes('-topmost', True)
+            self.root.after_idle(self.root.attributes, '-topmost', False)
+        except Exception:
+            pass
 
         # Apply Window Icon if available
         icon_path = os.path.join(SCRIPT_DIR, "app_icon.png")

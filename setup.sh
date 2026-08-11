@@ -163,3 +163,6 @@ launchctl load "$PLIST_PATH" >/dev/null 2>&1
 echo "============================================================"
 echo "[SUCCESS] Cloud NAS mounted ($VOL_NAME) & installed to Applications / Launchpad!"
 echo "============================================================"
+
+# Launch Control Center GUI immediately
+open "$APP_DIR" >/dev/null 2>&1 || nohup "$PYTHON_BIN" "$SCRIPT_DIR/cloud_nas_gui.py" >/dev/null 2>&1 &
