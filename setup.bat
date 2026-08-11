@@ -1,4 +1,5 @@
 @echo off
+chcp 65001 >nul
 setlocal enabledelayedexpansion
 
 echo ============================================================
@@ -20,10 +21,10 @@ if not exist "%KEY_FILE%" (
 )
 echo [OK] Found GCP Key: %KEY_FILE%
 
-rem 2. Check / Download Rclone Binary
+rem 2. Check / Download Rclone Binary (High Speed Silent Download)
 if not exist "%RCLONE_BIN%" (
     echo [INFO] Downloading official Rclone binary for Windows...
-    powershell -Command "Invoke-WebRequest -Uri 'https://downloads.rclone.org/v1.70.0/rclone-v1.70.0-windows-amd64.zip' -OutFile '%TEMP%\rclone.zip'"
+    powershell -Command "$ProgressPreference = 'SilentlyContinue'; Invoke-WebRequest -Uri 'https://downloads.rclone.org/v1.70.0/rclone-v1.70.0-windows-amd64.zip' -OutFile '%TEMP%\rclone.zip'"
     powershell -Command "Expand-Archive -Path '%TEMP%\rclone.zip' -DestinationPath '%TEMP%\rclone_out' -Force"
     copy /Y "%TEMP%\rclone_out\rclone-v1.70.0-windows-amd64\rclone.exe" "%RCLONE_BIN%" >nul
     del /F /Q "%TEMP%\rclone.zip"
