@@ -30,7 +30,7 @@ mkdir -p "$MOUNT_POINT"
 
 echo "Mounting Google Cloud Storage Bucket '$BUCKET_NAME' to '$MOUNT_POINT'..."
 
-"$RCLONE_BIN" mount "$REMOTE_NAME:$BUCKET_NAME" "$MOUNT_POINT" \
+nohup "$RCLONE_BIN" mount "$REMOTE_NAME:$BUCKET_NAME" "$MOUNT_POINT" \
     --vfs-cache-mode full \
     --vfs-cache-max-size 10G \
     --vfs-cache-max-age 24h \
@@ -38,7 +38,9 @@ echo "Mounting Google Cloud Storage Bucket '$BUCKET_NAME' to '$MOUNT_POINT'..."
     --allow-non-empty \
     --gcs-bucket-policy-only \
     --volname "Cloud NAS" \
-    --no-modtime \
-    --daemon
+    --rc \
+    --rc-no-auth \
+    --rc-addr 127.0.0.1:5572 \
+    --no-modtime >/dev/null 2>&1 &
 
 echo "Cloud NAS mounted successfully! Check macOS Finder -> Locations -> CloudNAS"

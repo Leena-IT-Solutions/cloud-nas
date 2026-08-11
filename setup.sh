@@ -38,13 +38,15 @@ echo "[INFO] Configuring Rclone..."
 
 # Mount Drive
 echo "[INFO] Mounting Cloud NAS to $MOUNT_POINT..."
+pkill -9 -f "rclone mount" >/dev/null 2>&1
 if [ -d "$MOUNT_POINT" ]; then
     diskutil unmount force "$MOUNT_POINT" >/dev/null 2>&1
     umount -f "$MOUNT_POINT" >/dev/null 2>&1
 fi
 mkdir -p "$MOUNT_POINT"
 
-"$RCLONE_BIN" mount "$REMOTE_NAME:$BUCKET_NAME" "$MOUNT_POINT" \
+# Launch rclone in background via nohup (prevents --daemon port re-bind timeouts)
+nohup "$RCLONE_BIN" mount "$REMOTE_NAME:$BUCKET_NAME" "$MOUNT_POINT" \
     --vfs-cache-mode full \
     --vfs-cache-max-size 10G \
     --vfs-cache-max-age 24h \
@@ -55,8 +57,9 @@ mkdir -p "$MOUNT_POINT"
     --rc \
     --rc-no-auth \
     --rc-addr 127.0.0.1:5572 \
-    --no-modtime \
-    --daemon
+    --no-modtime >/dev/null 2>&1 &
+
+sleep 1
 
 # Auto-start GUI on macOS login
 PLIST_PATH="$HOME/Library/LaunchAgents/com.cloudnas.controlcenter.plist"
