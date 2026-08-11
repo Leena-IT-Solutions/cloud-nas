@@ -52,9 +52,36 @@ mkdir -p "$MOUNT_POINT"
     --allow-non-empty \
     --gcs-bucket-policy-only \
     --volname "Cloud NAS" \
+    --rc \
+    --rc-no-auth \
+    --rc-addr 127.0.0.1:5572 \
     --no-modtime \
     --daemon
 
+# Auto-start GUI on macOS login
+PLIST_PATH="$HOME/Library/LaunchAgents/com.cloudnas.controlcenter.plist"
+cat << EOF > "$PLIST_PATH"
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.cloudnas.controlcenter</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>/usr/bin/python3</string>
+        <string>$SCRIPT_DIR/cloud_nas_gui.py</string>
+    </array>
+    <key>RunAtLoad</key>
+    <true/>
+</dict>
+</plist>
+EOF
+launchctl load "$PLIST_PATH" >/dev/null 2>&1
+
+# Launch Control Center GUI now
+python3 "$SCRIPT_DIR/cloud_nas_gui.py" &
+
 echo "============================================================"
-echo "[SUCCESS] Cloud NAS mounted in macOS Finder -> Locations -> CloudNAS!"
+echo "[SUCCESS] Cloud NAS Drive & Control Center GUI mounted & auto-started!"
 echo "============================================================"
