@@ -86,64 +86,102 @@ class CloudNASApp:
         self.show_login_screen()
 
     def load_users_data(self):
-        if not os.path.exists(USERS_FILE):
-            default_data = {
-                "users": [
-                    {
-                        "username": "admin",
-                        "password": "password",
-                        "role": "Admin",
-                        "folder_scope": "Full Access (All Folders)",
-                        "folder_path": "/",
-                        "permission": "Read-Write",
-                        "created_at": datetime.now().strftime("%Y-%m-%d %H:%M")
-                    },
-                    {
-                        "username": "philip",
-                        "password": "password",
-                        "role": "User",
-                        "folder_scope": "Specific Folder",
-                        "folder_path": "/Philip",
-                        "permission": "Read-Write",
-                        "created_at": datetime.now().strftime("%Y-%m-%d %H:%M")
-                    },
-                    {
-                        "username": "Sandeep Rathod",
-                        "password": "password",
-                        "role": "User",
-                        "folder_scope": "Specific Folder",
-                        "folder_path": "/Sandeep",
-                        "permission": "Read-Write",
-                        "created_at": datetime.now().strftime("%Y-%m-%d %H:%M")
-                    },
-                    {
-                        "username": "Leena Adam",
-                        "password": "password",
-                        "role": "User",
-                        "folder_scope": "Specific Folder",
-                        "folder_path": "/Leena",
-                        "permission": "Read-Only",
-                        "created_at": datetime.now().strftime("%Y-%m-%d %H:%M")
-                    }
-                ]
-            }
-            self.save_users_data(default_data)
-            self.users_data = default_data
-        else:
+        remote_target = "gcsnas:sv-school/.sys/users_permissions.json"
+        rclone_bin = os.path.join(SCRIPT_DIR, "rclone")
+        if not os.path.exists(rclone_bin):
+            rclone_bin = "rclone"
+
+        # 1. Fetch live user database from Google Cloud Storage remote
+        try:
+            res = subprocess.run([rclone_bin, "cat", remote_target], capture_output=True, text=True, timeout=5)
+            if res.returncode == 0 and res.stdout.strip():
+                data = json.loads(res.stdout)
+                if "users" in data:
+                    self.users_data = data
+                    with open(USERS_FILE, "w") as f:
+                        json.dump(data, f, indent=2)
+                    print("✅ Successfully loaded user permissions database from GCS Cloud Storage.")
+                    return
+        except Exception as e:
+            print(f"Could not read users from GCS remote: {e}")
+
+        # 2. Fallback to local file cache
+        if os.path.exists(USERS_FILE):
             try:
                 with open(USERS_FILE, "r") as f:
                     self.users_data = json.load(f)
+                    return
             except Exception:
-                self.users_data = {"users": []}
+                pass
+
+        # 3. Seed default user database and push to GCS Cloud Storage
+        default_data = {
+            "users": [
+                {
+                    "username": "admin",
+                    "password": "password",
+                    "role": "Admin",
+                    "folder_scope": "Full Access (All Folders)",
+                    "folder_path": "/",
+                    "permission": "Read-Write",
+                    "created_at": datetime.now().strftime("%Y-%m-%d %H:%M")
+                },
+                {
+                    "username": "philip",
+                    "password": "password",
+                    "role": "User",
+                    "folder_scope": "Specific Folder",
+                    "folder_path": "/Philip",
+                    "permission": "Read-Write",
+                    "created_at": datetime.now().strftime("%Y-%m-%d %H:%M")
+                },
+                {
+                    "username": "Sandeep Rathod",
+                    "password": "password",
+                    "role": "User",
+                    "folder_scope": "Specific Folder",
+                    "folder_path": "/Sandeep",
+                    "permission": "Read-Write",
+                    "created_at": datetime.now().strftime("%Y-%m-%d %H:%M")
+                },
+                {
+                    "username": "Leena Adam",
+                    "password": "password",
+                    "role": "User",
+                    "folder_scope": "Specific Folder",
+                    "folder_path": "/Leena",
+                    "permission": "Read-Only",
+                    "created_at": datetime.now().strftime("%Y-%m-%d %H:%M")
+                }
+            ]
+        }
+        self.users_data = default_data
+        self.save_users_data(default_data)
 
     def save_users_data(self, data=None):
         if data is None:
             data = self.users_data
+
+        # Save locally
         try:
             with open(USERS_FILE, "w") as f:
                 json.dump(data, f, indent=2)
         except Exception as e:
             print(f"Error saving users file: {e}")
+
+        # Sync to GCS Cloud Storage remote object
+        def _upload():
+            rclone_bin = os.path.join(SCRIPT_DIR, "rclone")
+            if not os.path.exists(rclone_bin):
+                rclone_bin = "rclone"
+            remote_target = "gcsnas:sv-school/.sys/users_permissions.json"
+            try:
+                subprocess.run([rclone_bin, "copyto", USERS_FILE, remote_target], capture_output=True, timeout=10)
+                print(f"✅ User permissions database synced to GCS Cloud Storage remote: {remote_target}")
+            except Exception as e:
+                print(f"Failed to sync users database to GCS: {e}")
+
+        threading.Thread(target=_upload, daemon=True).start()
 
     # ==========================================
     # 🔐 LOGIN SCREEN VIEW
