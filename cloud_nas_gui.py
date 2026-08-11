@@ -172,7 +172,19 @@ class CloudNASApp:
         console_frame = tk.Frame(self.root, bg="#181825", padx=15, pady=10)
         console_frame.pack(fill="both", expand=True)
 
-        tk.Label(console_frame, text="📋 ACTIVITY LOG", bg="#181825", fg="#a6adc8", font=("Segoe UI", 9, "bold")).pack(anchor="w", pady=(0, 3))
+        log_header_frame = tk.Frame(console_frame, bg="#181825")
+        log_header_frame.pack(fill="x", pady=(0, 4))
+
+        tk.Label(log_header_frame, text="📋 ACTIVITY LOG", bg="#181825", fg="#a6adc8", font=("Segoe UI", 9, "bold")).pack(side="left")
+
+        btn_clear = tk.Button(
+            log_header_frame,
+            text="🧹 Clear Logs",
+            command=self.action_clear_log,
+            bg="#313244", fg="#cdd6f4", activebackground="#45475a", activeforeground="#ffffff",
+            font=("Segoe UI", 8, "bold"), relief="flat", padx=8, pady=2, cursor="hand2"
+        )
+        btn_clear.pack(side="right")
 
         self.log_box = tk.Text(
             console_frame, 
@@ -273,6 +285,10 @@ class CloudNASApp:
             else:
                 self.log("❌ Pull failed. Check connection.")
         threading.Thread(target=_task, daemon=True).start()
+
+    def action_clear_log(self):
+        self.log_box.delete("1.0", "end")
+        self.log("Activity log cleared.")
 
 def main():
     root = tk.Tk()
