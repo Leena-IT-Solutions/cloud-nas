@@ -16,8 +16,7 @@ import threading
 import platform
 import subprocess
 import ssl
-import urllib.request
-import urllib.error
+import http.client
 import tkinter as tk
 from datetime import datetime
 
@@ -1170,13 +1169,19 @@ class CloudNASApp:
     # ==========================================
     def api_post(self, endpoint, params=None):
         try:
-            url = f"{RC_URL}/{endpoint}"
-            data = json.dumps(params).encode('utf-8') if params else b"{}"
-            req = urllib.request.Request(url, data=data, headers={'Content-Type': 'application/json'}, method='POST')
-            with urllib.request.urlopen(req, timeout=2) as resp:
-                return json.loads(resp.read().decode('utf-8'))
+            conn = http.client.HTTPConnection('127.0.0.1', 5572, timeout=2)
+            body = json.dumps(params) if params else "{}"
+            headers = {'Content-Type': 'application/json'}
+            conn.request('POST', f'/{endpoint}', body=body, headers=headers)
+            resp = conn.getresponse()
+            if resp.status == 200:
+                raw_data = resp.read()
+                conn.close()
+                return json.loads(raw_data.decode('utf-8'))
+            conn.close()
         except Exception:
-            return None
+            pass
+        return None
 
     def poll_stats_loop(self):
         while self.is_monitoring:
