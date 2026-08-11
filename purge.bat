@@ -17,16 +17,17 @@ echo ============================================================
 echo       🗑️ Windows 1-Click Cloud NAS Purge & Uninstall 🗑️
 echo ============================================================
 
-:: 1. Terminate Rclone Background Process & Unmount Drive
+:: 1. Terminate Rclone Background Process & GUI
 echo [INFO] Stopping Rclone background processes and unmounting %DRIVE_LETTER% Drive...
 taskkill /F /IM rclone.exe >nul 2>&1
+taskkill /F /FI "WINDOWTITLE eq Cloud NAS*" >nul 2>&1
 
 :: 2. Remove Rclone Config Remote
 echo [INFO] Removing GCS remote configuration...
 "%RCLONE_BIN%" config create gcsnas googlecloudstorage service_account_file "" >nul 2>&1
 "%RCLONE_BIN%" config delete gcsnas >nul 2>&1
 
-:: 3. Remove Startup Shortcuts & Start Menu Launcher
+:: 3. Remove Startup Shortcuts, Start Menu Launcher & Config
 set STARTUP_DIR=%APPDATA%\Microsoft\Windows\Start Menu\Programs\Startup
 set STARTMENU_DIR=%APPDATA%\Microsoft\Windows\Start Menu\Programs
 
@@ -38,6 +39,11 @@ if exist "%STARTUP_DIR%\CloudNAS-AutoMount.vbs" (
 if exist "%STARTMENU_DIR%\Cloud NAS.lnk" (
     echo [INFO] Removing Cloud NAS from Windows Start Menu...
     del /f /q "%STARTMENU_DIR%\Cloud NAS.lnk" >nul 2>&1
+)
+
+if exist "%SCRIPT_DIR%drive_config.json" (
+    echo [INFO] Resetting drive configuration...
+    del /f /q "%SCRIPT_DIR%drive_config.json" >nul 2>&1
 )
 
 echo ============================================================
