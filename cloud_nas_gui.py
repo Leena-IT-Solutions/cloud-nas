@@ -15,10 +15,17 @@ import socket
 import threading
 import platform
 import subprocess
+import ssl
 import urllib.request
 import urllib.error
 import tkinter as tk
 from datetime import datetime
+
+# Pre-initialize OpenSSL context on main thread to prevent Python 3.13 multithreaded SIGSEGV crash
+try:
+    ssl.create_default_context().load_default_certs()
+except Exception:
+    pass
 
 # Enforce Single Instance using local socket lock
 try:
@@ -757,48 +764,53 @@ class CloudNASApp:
             pass
 
     def chat_poller_loop(self):
-        """Polls GCS chat store every 3 seconds for live incoming messages."""
+        """Polls GCS chat store every 5 seconds for live incoming messages."""
         last_seen_count = {}
         
         while self.is_monitoring:
-            time.sleep(3.0)
+            time.sleep(5.0)
             if not self.logged_in_user:
                 continue
 
-            current_u = self.logged_in_user.get("username", "").lower()
-            all_users = [u["username"] for u in self.users_data.get("users", []) if u["username"].lower() != current_u]
+            try:
+                current_u = self.logged_in_user.get("username", "").lower()
+                all_users = [u["username"] for u in self.users_data.get("users", []) if u["username"].lower() != current_u]
 
-            for other_u in all_users:
-                messages = self.fetch_chat_history(current_u, other_u)
-                chat_id = self.get_chat_filename(current_u, other_u)
-                
-                prev_count = last_seen_count.get(chat_id, None)
-                curr_count = len(messages)
-                
-                if prev_count is not None and curr_count > prev_count:
-                    new_msgs = messages[prev_count:]
-                    for msg in new_msgs:
-                        sender = msg.get("sender", "User")
-                        if sender and sender.lower() != current_u:
-                            text = msg.get("text", "")
-                            
-                            # Increment unread badge count if not actively reading
-                            if self.active_tab != "chat" or self.active_chat_recipient != other_u:
-                                self.unread_counts[other_u] = self.unread_counts.get(other_u, 0) + 1
-                                self.root.after(0, self.update_chat_tab_badge)
+                for other_u in all_users:
+                    if not self.is_monitoring or not self.logged_in_user:
+                        break
+                    messages = self.fetch_chat_history(current_u, other_u)
+                    chat_id = self.get_chat_filename(current_u, other_u)
+                    
+                    prev_count = last_seen_count.get(chat_id, None)
+                    curr_count = len(messages)
+                    
+                    if prev_count is not None and curr_count > prev_count:
+                        new_msgs = messages[prev_count:]
+                        for msg in new_msgs:
+                            sender = msg.get("sender", "User")
+                            if sender and sender.lower() != current_u:
+                                text = msg.get("text", "")
+                                
+                                # Increment unread badge count if not actively reading
+                                if self.active_tab != "chat" or self.active_chat_recipient != other_u:
+                                    self.unread_counts[other_u] = self.unread_counts.get(other_u, 0) + 1
+                                    self.root.after(0, self.update_chat_tab_badge)
 
-                            # Send Desktop Notification
-                            self.root.after(0, self.send_desktop_notification, f"💬 Message from {sender}", text)
-                            
-                            # Log to console
-                            if hasattr(self, "log_box"):
-                                self.root.after(0, self.log, f"💬 Live Chat message from {sender}: '{text}'")
+                                # Send Desktop Notification
+                                self.root.after(0, self.send_desktop_notification, f"💬 Message from {sender}", text)
+                                
+                                # Log to console
+                                if hasattr(self, "log_box"):
+                                    self.root.after(0, self.log, f"💬 Live Chat message from {sender}: '{text}'")
 
-                            # Refresh chat window if currently open
-                            if self.active_tab == "chat" and self.active_chat_recipient == other_u:
-                                self.root.after(0, self.load_active_chat_messages)
+                                # Refresh chat window if currently open
+                                if self.active_tab == "chat" and self.active_chat_recipient == other_u:
+                                    self.root.after(0, self.load_active_chat_messages)
 
-                last_seen_count[chat_id] = curr_count
+                    last_seen_count[chat_id] = curr_count
+            except Exception as e:
+                print(f"Chat poller error: {e}")
 
     def render_chat_tab(self):
         # Ensure users database is loaded for non-admin users
