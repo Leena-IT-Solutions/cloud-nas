@@ -102,7 +102,7 @@ class CloudNASApp:
             res = subprocess.run([rclone_bin, "cat", remote_target], capture_output=True, text=True, timeout=5)
             if res.returncode == 0 and res.stdout.strip():
                 data = json.loads(res.stdout)
-                if "users" in data:
+                if "users" in data and len(data["users"]) > 0:
                     self.users_data = data
                     with open(USERS_FILE, "w") as f:
                         json.dump(data, f, indent=2)
@@ -115,54 +115,57 @@ class CloudNASApp:
         if os.path.exists(USERS_FILE):
             try:
                 with open(USERS_FILE, "r") as f:
-                    self.users_data = json.load(f)
-                    return
+                    data = json.load(f)
+                    if "users" in data and len(data["users"]) > 0:
+                        self.users_data = data
+                        return
             except Exception:
                 pass
 
-        # 3. Seed default user database and push to GCS Cloud Storage
-        default_data = {
-            "users": [
-                {
-                    "username": "admin",
-                    "password": "password",
-                    "role": "Admin",
-                    "folder_scope": "Full Access (All Folders)",
-                    "folder_path": "/",
-                    "permission": "Read-Write",
-                    "created_at": datetime.now().strftime("%Y-%m-%d %H:%M")
-                },
-                {
-                    "username": "philip",
-                    "password": "password",
-                    "role": "User",
-                    "folder_scope": "Specific Folder",
-                    "folder_path": "/Philip",
-                    "permission": "Read-Write",
-                    "created_at": datetime.now().strftime("%Y-%m-%d %H:%M")
-                },
-                {
-                    "username": "Sandeep Rathod",
-                    "password": "password",
-                    "role": "User",
-                    "folder_scope": "Specific Folder",
-                    "folder_path": "/Sandeep",
-                    "permission": "Read-Write",
-                    "created_at": datetime.now().strftime("%Y-%m-%d %H:%M")
-                },
-                {
-                    "username": "Leena Adam",
-                    "password": "password",
-                    "role": "User",
-                    "folder_scope": "Specific Folder",
-                    "folder_path": "/Leena",
-                    "permission": "Read-Only",
-                    "created_at": datetime.now().strftime("%Y-%m-%d %H:%M")
-                }
-            ]
-        }
-        self.users_data = default_data
-        self.save_users_data(default_data)
+        # 3. Seed default user database if not set
+        if not hasattr(self, "users_data") or not self.users_data.get("users"):
+            default_data = {
+                "users": [
+                    {
+                        "username": "admin",
+                        "password": "password",
+                        "role": "Admin",
+                        "folder_scope": "Full Access (All Folders)",
+                        "folder_path": "/",
+                        "permission": "Read-Write",
+                        "created_at": datetime.now().strftime("%Y-%m-%d %H:%M")
+                    },
+                    {
+                        "username": "philip",
+                        "password": "password",
+                        "role": "User",
+                        "folder_scope": "Specific Folder",
+                        "folder_path": "/Philip",
+                        "permission": "Read-Write",
+                        "created_at": datetime.now().strftime("%Y-%m-%d %H:%M")
+                    },
+                    {
+                        "username": "Sandeep Rathod",
+                        "password": "password",
+                        "role": "User",
+                        "folder_scope": "Specific Folder",
+                        "folder_path": "/Sandeep",
+                        "permission": "Read-Write",
+                        "created_at": datetime.now().strftime("%Y-%m-%d %H:%M")
+                    },
+                    {
+                        "username": "Leena Adam",
+                        "password": "password",
+                        "role": "User",
+                        "folder_scope": "Specific Folder",
+                        "folder_path": "/Leena",
+                        "permission": "Read-Only",
+                        "created_at": datetime.now().strftime("%Y-%m-%d %H:%M")
+                    }
+                ]
+            }
+            self.users_data = default_data
+            self.save_users_data(default_data)
 
     def save_users_data(self, data=None):
         if data is None:
@@ -789,6 +792,10 @@ class CloudNASApp:
                 last_seen_count[chat_id] = curr_count
 
     def render_chat_tab(self):
+        # Ensure users database is loaded for non-admin users
+        if not hasattr(self, "users_data") or not self.users_data.get("users"):
+            self.load_users_data()
+
         container = tk.Frame(self.content_frame, bg="#181825", padx=15, pady=10)
         container.pack(fill="both", expand=True)
 
