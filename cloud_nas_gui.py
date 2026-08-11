@@ -40,6 +40,7 @@ class DarkButton(tk.Label):
         self.command = command
         self.default_bg = bg
         self.hover_bg = hover_bg or bg
+        self._last_click = 0
         super().__init__(
             parent, 
             text=text, 
@@ -52,9 +53,17 @@ class DarkButton(tk.Label):
             relief="flat",
             **kwargs
         )
-        self.bind("<Button-1>", lambda e: self.command())
+        self.bind("<Button-1>", lambda e: self.trigger_click())
+        self.bind("<ButtonRelease-1>", lambda e: self.trigger_click())
         self.bind("<Enter>", lambda e: self.config(bg=self.hover_bg))
         self.bind("<Leave>", lambda e: self.config(bg=self.default_bg))
+
+    def trigger_click(self):
+        now = time.time()
+        if now - self._last_click > 0.2:
+            self._last_click = now
+            if self.command:
+                self.command()
 
 class CloudNASApp:
     def __init__(self, root):
