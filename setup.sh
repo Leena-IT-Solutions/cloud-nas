@@ -33,6 +33,7 @@ if [ -f "$ACTIVE_USER_FILE" ]; then
     PERM="$(grep -o '"permission": "[^"]*"' "$ACTIVE_USER_FILE" | cut -d'"' -f4)"
 
     if [ -n "$SUBPATH" ] && [ "$SUBPATH" != "/" ]; then
+        "$RCLONE_BIN" touch "$REMOTE_NAME:$BUCKET_NAME/$SUBPATH/.keep" >/dev/null 2>&1
         REMOTE_PATH="$REMOTE_NAME:$BUCKET_NAME/$SUBPATH"
     fi
     if [ "$PERM" = "Read-Only" ]; then
