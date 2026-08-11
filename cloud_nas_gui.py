@@ -10,6 +10,7 @@ import os
 import sys
 import time
 import json
+import socket
 import threading
 import platform
 import subprocess
@@ -18,6 +19,14 @@ import urllib.error
 import tkinter as tk
 from tkinter import ttk, messagebox
 from datetime import datetime
+
+# Enforce Single Instance using local socket lock
+try:
+    single_instance_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    single_instance_socket.bind(('127.0.0.1', 5573))
+except socket.error:
+    print("Cloud NAS Control Center is already running.")
+    sys.exit(0)
 
 RC_URL = "http://127.0.0.1:5572"
 IS_MAC = platform.system() == "Darwin"

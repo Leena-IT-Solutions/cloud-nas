@@ -61,27 +61,6 @@ nohup "$RCLONE_BIN" mount "$REMOTE_NAME:$BUCKET_NAME" "$MOUNT_POINT" \
 
 sleep 1
 
-# Auto-start GUI on macOS login
-PLIST_PATH="$HOME/Library/LaunchAgents/com.cloudnas.controlcenter.plist"
-cat << EOF > "$PLIST_PATH"
-<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<plist version="1.0">
-<dict>
-    <key>Label</key>
-    <string>com.cloudnas.controlcenter</string>
-    <key>ProgramArguments</key>
-    <array>
-        <string>/usr/bin/python3</string>
-        <string>$SCRIPT_DIR/cloud_nas_gui.py</string>
-    </array>
-    <key>RunAtLoad</key>
-    <true/>
-</dict>
-</plist>
-EOF
-launchctl load "$PLIST_PATH" >/dev/null 2>&1
-
 # Create macOS Application Bundle in ~/Applications/Cloud NAS.app for Launchpad & Spotlight
 APP_DIR="$HOME/Applications/Cloud NAS.app"
 mkdir -p "$APP_DIR/Contents/MacOS"
@@ -118,11 +97,28 @@ exec /usr/bin/python3 "$SCRIPT_DIR/cloud_nas_gui.py"
 EOF
 
 chmod +x "$APP_DIR/Contents/MacOS/Cloud NAS"
-touch "$APP_DIR"
-echo "[OK] Installed 'Cloud NAS' with custom 3D glass icon in macOS Applications & Launchpad!"
+echo "[OK] Installed 'Cloud NAS' with custom icon in macOS Applications & Launchpad!"
 
-# Launch Control Center GUI now
-python3 "$SCRIPT_DIR/cloud_nas_gui.py" &
+# Auto-start GUI on macOS login
+PLIST_PATH="$HOME/Library/LaunchAgents/com.cloudnas.controlcenter.plist"
+cat << EOF > "$PLIST_PATH"
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.cloudnas.controlcenter</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>/usr/bin/python3</string>
+        <string>$SCRIPT_DIR/cloud_nas_gui.py</string>
+    </array>
+    <key>RunAtLoad</key>
+    <true/>
+</dict>
+</plist>
+EOF
+launchctl load "$PLIST_PATH" >/dev/null 2>&1
 
 echo "============================================================"
 echo "[SUCCESS] Cloud NAS mounted & installed to Applications / Launchpad!"
