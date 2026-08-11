@@ -2,7 +2,7 @@
 """
 Cloud NAS Desktop Control Center & Live Monitor
 Provides real-time Upload/Download speeds, Transfer Queue, and Push/Pull/Refresh buttons.
-Pure Tkinter widgets for 100% reliable dark mode on macOS & Windows.
+Pure Tkinter custom widgets for 100% reliable dark mode button rendering on macOS & Windows.
 """
 
 import os
@@ -16,7 +16,6 @@ import subprocess
 import urllib.request
 import urllib.error
 import tkinter as tk
-from tkinter import messagebox
 from datetime import datetime
 
 # Enforce Single Instance using local socket lock
@@ -31,6 +30,28 @@ RC_URL = "http://127.0.0.1:5572"
 IS_MAC = platform.system() == "Darwin"
 IS_WIN = platform.system() == "Windows"
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+
+class DarkButton(tk.Label):
+    """Custom flat dark mode button with smooth hover effects for macOS & Windows."""
+    def __init__(self, parent, text, command, bg, fg, hover_bg=None, font=("Segoe UI", 9, "bold"), padx=14, pady=6, **kwargs):
+        self.command = command
+        self.default_bg = bg
+        self.hover_bg = hover_bg or bg
+        super().__init__(
+            parent, 
+            text=text, 
+            bg=bg, 
+            fg=fg, 
+            font=font, 
+            padx=padx, 
+            pady=pady, 
+            cursor="hand2", 
+            relief="flat",
+            **kwargs
+        )
+        self.bind("<Button-1>", lambda e: self.command())
+        self.bind("<Enter>", lambda e: self.config(bg=self.hover_bg))
+        self.bind("<Leave>", lambda e: self.config(bg=self.default_bg))
 
 class CloudNASApp:
     def __init__(self, root):
@@ -122,7 +143,7 @@ class CloudNASApp:
         self.active_file_lbl = tk.Label(queue_frame, text="No active file transfers", bg="#1e1e2e", fg="#cdd6f4", font=("Segoe UI", 9), anchor="w")
         self.active_file_lbl.pack(fill="x")
 
-        # Custom canvas progress bar for guaranteed dark theme rendering
+        # Custom canvas progress bar
         self.progress_canvas = tk.Canvas(queue_frame, bg="#313244", height=8, highlightthickness=0)
         self.progress_canvas.pack(fill="x", pady=(6, 0))
         self.progress_rect = self.progress_canvas.create_rectangle(0, 0, 0, 8, fill="#89b4fa", width=0)
@@ -139,32 +160,29 @@ class CloudNASApp:
         toolbar_frame.pack(fill="x")
 
         # Refresh Button
-        btn_refresh = tk.Button(
+        btn_refresh = DarkButton(
             toolbar_frame, 
             text="🔄 Refresh Data", 
             command=self.action_refresh_data,
-            bg="#89b4fa", fg="#11111b", activebackground="#74c7ec",
-            font=("Segoe UI", 9, "bold"), relief="flat", padx=12, pady=6, cursor="hand2"
+            bg="#89b4fa", fg="#11111b", hover_bg="#74c7ec"
         )
         btn_refresh.pack(side="left", padx=(0, 8))
 
         # Push Button
-        btn_push = tk.Button(
+        btn_push = DarkButton(
             toolbar_frame, 
             text="⬆️ Push (Sync Local -> GCS)", 
             command=self.action_push,
-            bg="#a6e3a1", fg="#11111b", activebackground="#94e2d5",
-            font=("Segoe UI", 9, "bold"), relief="flat", padx=12, pady=6, cursor="hand2"
+            bg="#a6e3a1", fg="#11111b", hover_bg="#94e2d5"
         )
         btn_push.pack(side="left", padx=(0, 8))
 
         # Pull Button
-        btn_pull = tk.Button(
+        btn_pull = DarkButton(
             toolbar_frame, 
             text="⬇️ Pull (Sync GCS -> Local)", 
             command=self.action_pull,
-            bg="#cba6f7", fg="#11111b", activebackground="#f5c2e7",
-            font=("Segoe UI", 9, "bold"), relief="flat", padx=12, pady=6, cursor="hand2"
+            bg="#cba6f7", fg="#11111b", hover_bg="#f5c2e7"
         )
         btn_pull.pack(side="left")
 
@@ -177,12 +195,12 @@ class CloudNASApp:
 
         tk.Label(log_header_frame, text="📋 ACTIVITY LOG", bg="#181825", fg="#a6adc8", font=("Segoe UI", 9, "bold")).pack(side="left")
 
-        btn_clear = tk.Button(
+        btn_clear = DarkButton(
             log_header_frame,
             text="🧹 Clear Logs",
             command=self.action_clear_log,
-            bg="#313244", fg="#cdd6f4", activebackground="#45475a", activeforeground="#ffffff",
-            font=("Segoe UI", 8, "bold"), relief="flat", padx=8, pady=2, cursor="hand2"
+            bg="#313244", fg="#cdd6f4", hover_bg="#45475a",
+            font=("Segoe UI", 8, "bold"), padx=10, pady=3
         )
         btn_clear.pack(side="right")
 
