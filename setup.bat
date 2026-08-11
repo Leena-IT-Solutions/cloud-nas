@@ -74,17 +74,22 @@ echo [OK] Rclone Binary Ready: %RCLONE_BIN%
 echo [INFO] Configuring Rclone GCS Remote '%REMOTE_NAME%'...
 "%RCLONE_BIN%" config create %REMOTE_NAME% googlecloudstorage service_account_file "%KEY_FILE%" bucket_policy_only true
 
-:: 5. Create Auto-Mount & Control Center GUI launcher inside shell:startup
+:: 5. Create Auto-Mount script inside shell:startup
 set STARTUP_DIR=%APPDATA%\Microsoft\Windows\Start Menu\Programs\Startup
-echo [INFO] Adding Cloud NAS Mount & Control Center GUI to Windows Startup (shell:startup)...
+echo [INFO] Adding Cloud NAS auto-mount to Windows Startup folder (shell:startup)...
 
 echo Set WshShell = CreateObject("WScript.Shell") > "%STARTUP_DIR%\CloudNAS-AutoMount.vbs"
 echo WshShell.Run "cscript //nologo ""%SCRIPT_DIR%windows-mount-hidden.vbs""", 0, False >> "%STARTUP_DIR%\CloudNAS-AutoMount.vbs"
 echo WshShell.Run "pythonw.exe ""%SCRIPT_DIR%cloud_nas_gui.py""", 0, False >> "%STARTUP_DIR%\CloudNAS-AutoMount.vbs"
 
-echo [OK] Auto-start on boot enabled for Drive & Control Center GUI!
+echo [OK] Auto-mount on Windows boot enabled!
 
-:: 6. Launch Background Mount & Control Center GUI Now
+:: 6. Create Start Menu Programs Shortcut
+echo [INFO] Creating Windows Start Menu Shortcut...
+powershell -Command "$s=(New-Object -COM WScript.Shell).CreateShortcut('$env:APPDATA\Microsoft\Windows\Start Menu\Programs\Cloud NAS.lnk'); $s.TargetPath='pythonw.exe'; $s.Arguments='""%SCRIPT_DIR%cloud_nas_gui.py""'; $s.WorkingDirectory='%SCRIPT_DIR%'; $s.Save()"
+echo [OK] Installed 'Cloud NAS' in Windows Start Menu!
+
+:: 7. Launch Background Mount & Control Center GUI Now
 echo [INFO] Launching Cloud NAS Drive %DRIVE_LETTER% and Control Center GUI...
 cscript //nologo "%SCRIPT_DIR%windows-mount-hidden.vbs"
 start "" pythonw "%SCRIPT_DIR%cloud_nas_gui.py"
@@ -93,7 +98,7 @@ echo.
 echo ============================================================
 echo [SUCCESS] Cloud NAS Setup Completed!
 echo Check 'This PC' in File Explorer for Local Disk (%DRIVE_LETTER%)
-echo Control Center GUI is running and added to Windows Startup!
+echo 'Cloud NAS' app added to Windows Start Menu Programs!
 echo ============================================================
 echo.
 pause

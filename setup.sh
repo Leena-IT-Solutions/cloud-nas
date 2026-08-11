@@ -45,7 +45,7 @@ if [ -d "$MOUNT_POINT" ]; then
 fi
 mkdir -p "$MOUNT_POINT"
 
-# Launch rclone in background via nohup (prevents --daemon port re-bind timeouts)
+# Launch rclone in background via nohup
 nohup "$RCLONE_BIN" mount "$REMOTE_NAME:$BUCKET_NAME" "$MOUNT_POINT" \
     --vfs-cache-mode full \
     --vfs-cache-max-size 10G \
@@ -82,9 +82,41 @@ cat << EOF > "$PLIST_PATH"
 EOF
 launchctl load "$PLIST_PATH" >/dev/null 2>&1
 
+# Create macOS Application Bundle in ~/Applications/Cloud NAS.app for Launchpad & Spotlight
+APP_DIR="$HOME/Applications/Cloud NAS.app"
+mkdir -p "$APP_DIR/Contents/MacOS"
+mkdir -p "$APP_DIR/Contents/Resources"
+
+cat << EOF > "$APP_DIR/Contents/Info.plist"
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>CFBundleExecutable</key>
+    <string>Cloud NAS</string>
+    <key>CFBundleIdentifier</key>
+    <string>com.cloudnas.controlcenter</string>
+    <key>CFBundleName</key>
+    <string>Cloud NAS</string>
+    <key>CFBundlePackageType</key>
+    <string>APPL</string>
+    <key>CFBundleShortVersionString</key>
+    <string>1.0</string>
+</dict>
+</plist>
+EOF
+
+cat << EOF > "$APP_DIR/Contents/MacOS/Cloud NAS"
+#!/usr/bin/env bash
+exec /usr/bin/python3 "$SCRIPT_DIR/cloud_nas_gui.py"
+EOF
+
+chmod +x "$APP_DIR/Contents/MacOS/Cloud NAS"
+echo "[OK] Installed 'Cloud NAS' in macOS Applications & Launchpad!"
+
 # Launch Control Center GUI now
 python3 "$SCRIPT_DIR/cloud_nas_gui.py" &
 
 echo "============================================================"
-echo "[SUCCESS] Cloud NAS Drive & Control Center GUI mounted & auto-started!"
+echo "[SUCCESS] Cloud NAS mounted & installed to Applications / Launchpad!"
 echo "============================================================"

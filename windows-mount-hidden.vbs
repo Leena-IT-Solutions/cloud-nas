@@ -15,7 +15,7 @@ If Not fso.FileExists(rcloneExe) Then
     End If
 End If
 
-rcloneCmd = """" & rcloneExe & """ mount gcsnas:sv-school Y: --vfs-cache-mode full --vfs-cache-max-size 10G --vfs-cache-max-age 24h --vfs-write-back 1s --gcs-bucket-policy-only --links --no-modtime"
+rcloneCmd = """" & rcloneExe & """ mount gcsnas:sv-school Y: --vfs-cache-mode full --vfs-cache-max-size 10G --vfs-cache-max-age 24h --vfs-write-back 1s --gcs-bucket-policy-only --links --rc --rc-no-auth --rc-addr 127.0.0.1:5572 --no-modtime"
 
 ' Run hidden (0 = hidden window, False = don't wait)
 WshShell.Run rcloneCmd, 0, False

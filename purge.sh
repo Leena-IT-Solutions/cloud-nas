@@ -3,7 +3,8 @@
 
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 MOUNT_POINT="$HOME/CloudNAS"
-PLIST_PATH="$HOME/Library/LaunchAgents/com.cloudnas.automount.plist"
+PLIST_PATH="$HOME/Library/LaunchAgents/com.cloudnas.controlcenter.plist"
+APP_DIR="$HOME/Applications/Cloud NAS.app"
 RCLONE_BIN="$SCRIPT_DIR/rclone"
 
 if [ ! -f "$RCLONE_BIN" ]; then
@@ -30,11 +31,17 @@ if [ -f "$PLIST_PATH" ]; then
     rm -f "$PLIST_PATH"
 fi
 
-# 4. Remove Rclone Remote Config
+# 4. Remove macOS Applications Bundle
+if [ -d "$APP_DIR" ]; then
+    echo "[INFO] Removing Cloud NAS from macOS Applications & Launchpad..."
+    rm -rf "$APP_DIR"
+fi
+
+# 5. Remove Rclone Remote Config
 echo "[INFO] Removing GCS remote configuration..."
 "$RCLONE_BIN" config delete gcsnas >/dev/null 2>&1
 
-# 5. Remove Mount Directory
+# 6. Remove Mount Directory
 if [ -d "$MOUNT_POINT" ]; then
     echo "[INFO] Removing mount directory $MOUNT_POINT..."
     rm -rf "$MOUNT_POINT"
