@@ -74,13 +74,14 @@ echo [OK] Rclone Binary Ready: %RCLONE_BIN%
 echo [INFO] Configuring Rclone GCS Remote '%REMOTE_NAME%'...
 "%RCLONE_BIN%" config create %REMOTE_NAME% googlecloudstorage service_account_file "%KEY_FILE%" bucket_policy_only true
 
-:: 5. Copy to shell:startup for Auto-Mount on Windows Boot
+:: 5. Create Auto-Mount script inside shell:startup
 set STARTUP_DIR=%APPDATA%\Microsoft\Windows\Start Menu\Programs\Startup
-if exist "%STARTUP_DIR%" (
-    echo [INFO] Adding Cloud NAS auto-mount to Windows Startup folder (shell:startup)...
-    copy /y "%SCRIPT_DIR%windows-mount-hidden.vbs" "%STARTUP_DIR%\windows-mount-hidden.vbs" >nul
-    echo [OK] Auto-mount on Windows boot enabled!
-)
+echo [INFO] Adding Cloud NAS auto-mount to Windows Startup folder (shell:startup)...
+
+echo Set WshShell = CreateObject("WScript.Shell") > "%STARTUP_DIR%\CloudNAS-AutoMount.vbs"
+echo WshShell.Run "cscript //nologo ""%SCRIPT_DIR%windows-mount-hidden.vbs""", 0, False >> "%STARTUP_DIR%\CloudNAS-AutoMount.vbs"
+
+echo [OK] Auto-mount on Windows boot successfully added to shell:startup!
 
 :: 6. Launch Background Mount Now
 echo [INFO] Launching Cloud NAS Drive %DRIVE_LETTER% in background...
@@ -90,7 +91,7 @@ echo.
 echo ============================================================
 echo [SUCCESS] Cloud NAS Setup Completed!
 echo Check 'This PC' in File Explorer for Local Disk (%DRIVE_LETTER%)
-echo Auto-mount on startup added to shell:startup!
+echo Auto-mount on startup enabled in shell:startup!
 echo ============================================================
 echo.
 pause
