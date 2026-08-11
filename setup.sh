@@ -5,14 +5,26 @@ SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 KEY_FILE="$SCRIPT_DIR/leena-it-solutions-412315-f63f3bd287c1.json"
 BUCKET_NAME="sv-school"
 REMOTE_NAME="gcsnas"
-MOUNT_POINT="$HOME/CloudNAS"
 RCLONE_BIN="$SCRIPT_DIR/rclone"
 
-# Resolve exact Python 3 binary path (e.g. Python 3.13 Framework)
+# Resolve exact Python 3 binary path
 PYTHON_BIN="$(which python3)"
 if [ -z "$PYTHON_BIN" ]; then
     PYTHON_BIN="/usr/bin/python3"
 fi
+
+CONFIG_FILE="$SCRIPT_DIR/drive_config.json"
+VOL_NAME="Cloud NAS"
+
+# Read custom drive name from drive_config.json if present
+if [ -f "$CONFIG_FILE" ]; then
+    PARSED_NAME="$(grep -o '"volname": "[^"]*"' "$CONFIG_FILE" | cut -d'"' -f4)"
+    if [ -n "$PARSED_NAME" ]; then
+        VOL_NAME="$PARSED_NAME"
+    fi
+fi
+
+MOUNT_POINT="$HOME/$VOL_NAME"
 
 echo "============================================================"
 echo "      🚀 macOS 1-Click Cloud NAS Installer 🚀"
@@ -43,7 +55,7 @@ echo "[INFO] Configuring Rclone..."
 "$RCLONE_BIN" config create "$REMOTE_NAME" googlecloudstorage service_account_file "$KEY_FILE" bucket_policy_only true >/dev/null 2>&1
 
 # Mount Drive
-echo "[INFO] Mounting Cloud NAS to $MOUNT_POINT..."
+echo "[INFO] Mounting Cloud NAS ($VOL_NAME) to $MOUNT_POINT..."
 pkill -9 -f "rclone mount" >/dev/null 2>&1
 if [ -d "$MOUNT_POINT" ]; then
     diskutil unmount force "$MOUNT_POINT" >/dev/null 2>&1
@@ -59,7 +71,7 @@ nohup "$RCLONE_BIN" mount "$REMOTE_NAME:$BUCKET_NAME" "$MOUNT_POINT" \
     --vfs-write-back 1s \
     --allow-non-empty \
     --gcs-bucket-policy-only \
-    --volname "Cloud NAS" \
+    --volname "$VOL_NAME" \
     --rc \
     --rc-no-auth \
     --rc-addr 127.0.0.1:5572 \
@@ -127,5 +139,5 @@ EOF
 launchctl load "$PLIST_PATH" >/dev/null 2>&1
 
 echo "============================================================"
-echo "[SUCCESS] Cloud NAS mounted & installed to Applications / Launchpad!"
+echo "[SUCCESS] Cloud NAS mounted ($VOL_NAME) & installed to Applications / Launchpad!"
 echo "============================================================"

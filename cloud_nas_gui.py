@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """
 Cloud NAS Desktop Control Center & Live Monitor
-Provides real-time Upload/Download speeds, Transfer Queue, and Push/Pull/Refresh buttons.
-Pure Tkinter custom widgets for 100% reliable dark mode button rendering on macOS & Windows.
+Provides real-time Upload/Download speeds, Transfer Queue, Push/Pull/Refresh buttons, and Drive Renaming.
+Pure Tkinter custom widgets for 100% reliable dark mode rendering on macOS & Windows.
 """
 
 import os
@@ -57,8 +57,8 @@ class CloudNASApp:
     def __init__(self, root):
         self.root = root
         self.root.title("Cloud NAS - Control Center & Bandwidth Monitor")
-        self.root.geometry("640x520")
-        self.root.minsize(580, 480)
+        self.root.geometry("640x550")
+        self.root.minsize(580, 500)
         self.root.configure(bg="#181825")  # Dark Catppuccin Base
 
         # Apply Window Icon if available
@@ -76,6 +76,7 @@ class CloudNASApp:
 
         # Build UI Components
         self.create_header()
+        self.create_drive_settings_bar()
         self.create_speed_cards()
         self.create_transfer_queue()
         self.create_action_toolbar()
@@ -85,8 +86,19 @@ class CloudNASApp:
         self.poll_thread = threading.Thread(target=self.poll_stats_loop, daemon=True)
         self.poll_thread.start()
 
+    def get_current_drive_name(self):
+        config_path = os.path.join(SCRIPT_DIR, "drive_config.json")
+        if os.path.exists(config_path):
+            try:
+                with open(config_path, "r") as f:
+                    data = json.load(f)
+                    return data.get("volname", "Cloud NAS")
+            except Exception:
+                pass
+        return "Cloud NAS"
+
     def create_header(self):
-        header_frame = tk.Frame(self.root, bg="#181825", padx=15, pady=12)
+        header_frame = tk.Frame(self.root, bg="#181825", padx=15, pady=10)
         header_frame.pack(fill="x")
 
         title_label = tk.Label(
@@ -109,6 +121,41 @@ class CloudNASApp:
             relief="flat"
         )
         self.status_badge.pack(side="right")
+
+    def create_drive_settings_bar(self):
+        settings_frame = tk.Frame(self.root, bg="#1e1e2e", padx=14, pady=8, highlightthickness=1, highlightbackground="#313244")
+        settings_frame.pack(fill="x", padx=15, pady=(0, 8))
+
+        tk.Label(
+            settings_frame,
+            text="🏷️ Drive Name:",
+            bg="#1e1e2e",
+            fg="#a6adc8",
+            font=("Segoe UI", 9, "bold")
+        ).pack(side="left", padx=(0, 6))
+
+        self.drive_name_entry = tk.Entry(
+            settings_frame,
+            bg="#181825",
+            fg="#cdd6f4",
+            insertbackground="#cdd6f4",
+            font=("Segoe UI", 9, "bold"),
+            relief="flat",
+            highlightthickness=1,
+            highlightbackground="#313244",
+            width=20
+        )
+        self.drive_name_entry.insert(0, self.get_current_drive_name())
+        self.drive_name_entry.pack(side="left", padx=(0, 8))
+
+        btn_rename = DarkButton(
+            settings_frame,
+            text="✏️ Save & Remount Drive",
+            command=self.action_rename_drive,
+            bg="#f9e2af", fg="#11111b", hover_bg="#fae3b0",
+            font=("Segoe UI", 8, "bold"), padx=10, pady=4
+        )
+        btn_rename.pack(side="left")
 
     def create_speed_cards(self):
         cards_frame = tk.Frame(self.root, bg="#181825", padx=15, pady=5)
@@ -272,6 +319,34 @@ class CloudNASApp:
         self.down_speed_lbl.config(text="0.0 KB/s")
         self.active_file_lbl.config(text="Cloud NAS is not currently mounted.")
         self.set_progress(0)
+
+    def action_rename_drive(self):
+        new_name = self.drive_name_entry.get().strip()
+        if not new_name:
+            new_name = "Cloud NAS"
+            self.drive_name_entry.delete(0, "end")
+            self.drive_name_entry.insert(0, new_name)
+        
+        config_path = os.path.join(SCRIPT_DIR, "drive_config.json")
+        try:
+            with open(config_path, "w") as f:
+                json.dump({"volname": new_name}, f, indent=2)
+        except Exception as e:
+            self.log(f"❌ Failed to save drive config: {e}")
+            return
+
+        def _remount():
+            self.log(f"✏️ Renaming Cloud NAS volume to '{new_name}'...")
+            self.log("Unmounting current volume & re-applying volume name...")
+            if IS_MAC:
+                mount_script = os.path.join(SCRIPT_DIR, "mac-mount.sh")
+                subprocess.run(["bash", mount_script], capture_output=True)
+            elif IS_WIN:
+                mount_script = os.path.join(SCRIPT_DIR, "windows-mount-hidden.vbs")
+                subprocess.run(["cscript", "//nologo", mount_script], capture_output=True)
+            self.log(f"✅ Drive successfully renamed to '{new_name}' and remounted!")
+
+        threading.Thread(target=_remount, daemon=True).start()
 
     def action_refresh_data(self):
         def _task():
