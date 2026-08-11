@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """
 Cloud NAS Desktop Control Center & Live Monitor
-Provides real-time Upload/Download speeds, Transfer Queue, Push/Pull/Refresh buttons, Drive Renaming,
-and Real-time Live File Activity Logging (Additions, Modifications, Deletions).
+Provides Authentication (admin/password), User & Permission Management, real-time Upload/Download speeds,
+Transfer Queue, Push/Pull/Refresh buttons, Drive Renaming, and Live File Activity Logging.
 Pure Tkinter custom widgets for 100% reliable dark mode rendering on macOS & Windows.
 """
 
@@ -31,6 +31,7 @@ RC_URL = "http://127.0.0.1:5572"
 IS_MAC = platform.system() == "Darwin"
 IS_WIN = platform.system() == "Windows"
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+USERS_FILE = os.path.join(SCRIPT_DIR, "users_permissions.json")
 
 class DarkButton(tk.Label):
     """Custom flat dark mode button with smooth hover effects for macOS & Windows."""
@@ -57,9 +58,9 @@ class DarkButton(tk.Label):
 class CloudNASApp:
     def __init__(self, root):
         self.root = root
-        self.root.title("Cloud NAS - Control Center & Bandwidth Monitor")
-        self.root.geometry("640x560")
-        self.root.minsize(580, 500)
+        self.root.title("Cloud NAS - Control Center & Permissions Manager")
+        self.root.geometry("660x600")
+        self.root.minsize(620, 520)
         self.root.configure(bg="#181825")  # Dark Catppuccin Base
 
         # Apply Window Icon if available
@@ -72,25 +73,231 @@ class CloudNASApp:
                 pass
 
         # State Variables
+        self.logged_in_user = None
         self.is_monitoring = True
         self.mounted = False
         self.tracked_transfers = set()
+        self.active_tab = "dashboard"
 
-        # Build UI Components
+        # Load / Initialize Users Database
+        self.load_users_data()
+
+        # Render Initial Login View
+        self.show_login_screen()
+
+    def load_users_data(self):
+        if not os.path.exists(USERS_FILE):
+            default_data = {
+                "users": [
+                    {
+                        "username": "admin",
+                        "password": "password",
+                        "role": "Admin",
+                        "permission": "Full Access (Read/Write)",
+                        "created_at": datetime.now().strftime("%Y-%m-%d %H:%M")
+                    },
+                    {
+                        "username": "Sandeep Rathod",
+                        "password": "password",
+                        "role": "User",
+                        "permission": "Full Access (Read/Write)",
+                        "created_at": datetime.now().strftime("%Y-%m-%d %H:%M")
+                    },
+                    {
+                        "username": "Leena Adam",
+                        "password": "password",
+                        "role": "User",
+                        "permission": "Read-Only",
+                        "created_at": datetime.now().strftime("%Y-%m-%d %H:%M")
+                    }
+                ]
+            }
+            self.save_users_data(default_data)
+            self.users_data = default_data
+        else:
+            try:
+                with open(USERS_FILE, "r") as f:
+                    self.users_data = json.load(f)
+            except Exception:
+                self.users_data = {"users": []}
+
+    def save_users_data(self, data=None):
+        if data is None:
+            data = self.users_data
+        try:
+            with open(USERS_FILE, "w") as f:
+                json.dump(data, f, indent=2)
+        except Exception as e:
+            print(f"Error saving users file: {e}")
+
+    # ==========================================
+    # 🔐 LOGIN SCREEN VIEW
+    # ==========================================
+    def show_login_screen(self):
+        # Clear existing widgets
+        for widget in self.root.winfo_children():
+            widget.destroy()
+
+        login_container = tk.Frame(self.root, bg="#181825")
+        login_container.place(relx=0.5, rely=0.5, anchor="center")
+
+        card = tk.Frame(login_container, bg="#1e1e2e", padx=30, pady=30, highlightthickness=1, highlightbackground="#313244")
+        card.pack()
+
+        tk.Label(card, text="☁️ Cloud NAS Control Center", bg="#1e1e2e", fg="#cdd6f4", font=("Segoe UI", 16, "bold")).pack(pady=(0, 5))
+        tk.Label(card, text="🔐 Administrator Authentication Required", bg="#1e1e2e", fg="#a6adc8", font=("Segoe UI", 9)).pack(pady=(0, 20))
+
+        # Username Input
+        tk.Label(card, text="Username:", bg="#1e1e2e", fg="#bac2de", font=("Segoe UI", 9, "bold")).pack(anchor="w", pady=(0, 2))
+        self.login_user_entry = tk.Entry(
+            card, bg="#181825", fg="#cdd6f4", insertbackground="#cdd6f4",
+            font=("Segoe UI", 10), relief="flat", highlightthickness=1, highlightbackground="#313244", width=26
+        )
+        self.login_user_entry.insert(0, "admin")
+        self.login_user_entry.pack(pady=(0, 12))
+
+        # Password Input
+        tk.Label(card, text="Password:", bg="#1e1e2e", fg="#bac2de", font=("Segoe UI", 9, "bold")).pack(anchor="w", pady=(0, 2))
+        self.login_pass_entry = tk.Entry(
+            card, bg="#181825", fg="#cdd6f4", insertbackground="#cdd6f4", show="•",
+            font=("Segoe UI", 10), relief="flat", highlightthickness=1, highlightbackground="#313244", width=26
+        )
+        self.login_pass_entry.insert(0, "password")
+        self.login_pass_entry.pack(pady=(0, 15))
+
+        self.login_err_lbl = tk.Label(card, text="", bg="#1e1e2e", fg="#f38ba8", font=("Segoe UI", 9, "bold"))
+        self.login_err_lbl.pack(pady=(0, 8))
+
+        # Login Button
+        btn_login = DarkButton(
+            card, text="🔓 Sign In to Control Center", command=self.handle_login,
+            bg="#89b4fa", fg="#11111b", hover_bg="#74c7ec", font=("Segoe UI", 10, "bold"), padx=20, pady=8
+        )
+        btn_login.pack(fill="x")
+
+        # Keybinding for Enter key
+        self.root.bind("<Return>", lambda e: self.handle_login())
+
+    def handle_login(self):
+        u_input = self.login_user_entry.get().strip()
+        p_input = self.login_pass_entry.get().strip()
+
+        for u in self.users_data.get("users", []):
+            if u["username"] == u_input and u["password"] == p_input:
+                self.logged_in_user = u
+                self.root.unbind("<Return>")
+                self.show_main_app()
+                return
+
+        self.login_err_lbl.config(text="❌ Invalid Username or Password")
+
+    # ==========================================
+    # 🎛️ MAIN APPLICATION DASHBOARD VIEW
+    # ==========================================
+    def show_main_app(self):
+        for widget in self.root.winfo_children():
+            widget.destroy()
+
+        # Header Frame
         self.create_header()
-        self.create_drive_settings_bar()
-        self.create_speed_cards()
-        self.create_transfer_queue()
-        self.create_action_toolbar()
-        self.create_log_console()
+        
+        # Navigation Tabs Bar
+        self.create_tab_bar()
+
+        # Content Main Container Frame
+        self.content_frame = tk.Frame(self.root, bg="#181825")
+        self.content_frame.pack(fill="both", expand=True)
+
+        # Show Default Dashboard View
+        self.render_dashboard_tab()
 
         # Start Background Stats Poller
         self.poll_thread = threading.Thread(target=self.poll_stats_loop, daemon=True)
         self.poll_thread.start()
 
-        # Start Live File Activity Watcher (Add, Modify, Delete)
+        # Start Live File Activity Watcher
         self.fs_thread = threading.Thread(target=self.fs_watcher_loop, daemon=True)
         self.fs_thread.start()
+
+    def create_header(self):
+        header_frame = tk.Frame(self.root, bg="#181825", padx=15, pady=10)
+        header_frame.pack(fill="x")
+
+        title_label = tk.Label(
+            header_frame, 
+            text="☁️ Cloud NAS Control Center", 
+            bg="#181825", 
+            fg="#cdd6f4", 
+            font=("Segoe UI", 14, "bold")
+        )
+        title_label.pack(side="left")
+
+        right_panel = tk.Frame(header_frame, bg="#181825")
+        right_panel.pack(side="right")
+
+        self.status_badge = tk.Label(
+            right_panel, 
+            text="● CONNECTING...", 
+            bg="#f9e2af", 
+            fg="#11111b", 
+            font=("Segoe UI", 9, "bold"),
+            padx=8, 
+            pady=2,
+            relief="flat"
+        )
+        self.status_badge.pack(side="left", padx=(0, 10))
+
+        btn_logout = DarkButton(
+            right_panel, text="🚪 Logout", command=self.handle_logout,
+            bg="#313244", fg="#cdd6f4", hover_bg="#45475a", font=("Segoe UI", 8, "bold"), padx=8, pady=2
+        )
+        btn_logout.pack(side="left")
+
+    def handle_logout(self):
+        self.logged_in_user = None
+        self.show_login_screen()
+
+    def create_tab_bar(self):
+        tab_frame = tk.Frame(self.root, bg="#181825", padx=15, pady=0)
+        tab_frame.pack(fill="x", pady=(0, 5))
+
+        self.btn_tab_dashboard = DarkButton(
+            tab_frame, text="📊 Live Dashboard & Storage", command=self.switch_to_dashboard,
+            bg="#89b4fa", fg="#11111b", hover_bg="#74c7ec", font=("Segoe UI", 9, "bold"), padx=14, pady=5
+        )
+        self.btn_tab_dashboard.pack(side="left", padx=(0, 6))
+
+        self.btn_tab_users = DarkButton(
+            tab_frame, text="👥 Users & Permissions", command=self.switch_to_users,
+            bg="#313244", fg="#cdd6f4", hover_bg="#45475a", font=("Segoe UI", 9, "bold"), padx=14, pady=5
+        )
+        self.btn_tab_users.pack(side="left")
+
+    def switch_to_dashboard(self):
+        self.active_tab = "dashboard"
+        self.btn_tab_dashboard.config(bg="#89b4fa", fg="#11111b")
+        self.btn_tab_users.config(bg="#313244", fg="#cdd6f4")
+        for widget in self.content_frame.winfo_children():
+            widget.destroy()
+        self.render_dashboard_tab()
+
+    def switch_to_users(self):
+        self.active_tab = "users"
+        self.btn_tab_users.config(bg="#cba6f7", fg="#11111b")
+        self.btn_tab_dashboard.config(bg="#313244", fg="#cdd6f4")
+        for widget in self.content_frame.winfo_children():
+            widget.destroy()
+        self.render_users_tab()
+
+    # ==========================================
+    # 📊 TAB 1: DASHBOARD & DRIVE SETTINGS
+    # ==========================================
+    def render_dashboard_tab(self):
+        self.create_drive_settings_bar()
+        self.create_speed_cards()
+        self.create_transfer_queue()
+        self.create_action_toolbar()
+        self.create_log_console()
 
     def get_current_drive_name(self):
         config_path = os.path.join(SCRIPT_DIR, "drive_config.json")
@@ -119,7 +326,7 @@ class CloudNASApp:
                     dir_set.add(rel_root)
 
                 for f in files:
-                    if f.startswith("."):  # Ignore system hidden files like .DS_Store
+                    if f.startswith("."):  # Ignore system hidden files
                         continue
                     full_path = os.path.join(root, f)
                     try:
@@ -133,7 +340,6 @@ class CloudNASApp:
         return file_map, dir_set
 
     def fs_watcher_loop(self):
-        """Monitors local mount drive for live file & folder additions, modifications, and deletions."""
         mount_path = self.get_mount_path()
         last_files, last_dirs = self.scan_mount_files(mount_path)
 
@@ -146,8 +352,7 @@ class CloudNASApp:
 
             current_files, current_dirs = self.scan_mount_files(current_path)
 
-            if last_files or last_dirs:
-                # Detect added folders and auto-sync them to GCS server
+            if (last_files or last_dirs) and self.active_tab == "dashboard" and hasattr(self, "log_box"):
                 for rel_dir in current_dirs:
                     if rel_dir not in last_dirs:
                         full_dir_path = os.path.join(current_path, rel_dir)
@@ -158,25 +363,21 @@ class CloudNASApp:
                                     kf.write("")
                             except Exception:
                                 pass
-                        self.root.after(0, self.log, f"📁 Folder Created & Synced to Cloud: {rel_dir}")
+                        self.root.after(0, self.log, f"📁 Folder Created & Synced: {rel_dir}")
 
-                # Detect deleted folders
                 for rel_dir in last_dirs:
                     if rel_dir not in current_dirs:
                         self.root.after(0, self.log, f"🗑️ Folder Deleted: {rel_dir}")
 
-                # Detect added files
                 for rel_p in current_files:
                     if rel_p not in last_files:
                         self.root.after(0, self.log, f"➕ File Added: {rel_p}")
                     else:
-                        # Detect modified files
                         old_mtime, old_size = last_files[rel_p]
                         new_mtime, new_size = current_files[rel_p]
                         if new_mtime > old_mtime or new_size != old_size:
                             self.root.after(0, self.log, f"✏️ File Modified: {rel_p}")
 
-                # Detect deleted files
                 for rel_p in last_files:
                     if rel_p not in current_files:
                         self.root.after(0, self.log, f"🗑️ File Deleted: {rel_p}")
@@ -184,92 +385,51 @@ class CloudNASApp:
             last_files = current_files
             last_dirs = current_dirs
 
-    def create_header(self):
-        header_frame = tk.Frame(self.root, bg="#181825", padx=15, pady=10)
-        header_frame.pack(fill="x")
-
-        title_label = tk.Label(
-            header_frame, 
-            text="☁️ Cloud NAS Control Center", 
-            bg="#181825", 
-            fg="#cdd6f4", 
-            font=("Segoe UI", 14, "bold")
-        )
-        title_label.pack(side="left")
-
-        self.status_badge = tk.Label(
-            header_frame, 
-            text="● CONNECTING...", 
-            bg="#f9e2af", 
-            fg="#11111b", 
-            font=("Segoe UI", 9, "bold"),
-            padx=10, 
-            pady=3,
-            relief="flat"
-        )
-        self.status_badge.pack(side="right")
-
     def create_drive_settings_bar(self):
-        settings_frame = tk.Frame(self.root, bg="#1e1e2e", padx=14, pady=8, highlightthickness=1, highlightbackground="#313244")
+        settings_frame = tk.Frame(self.content_frame, bg="#1e1e2e", padx=14, pady=8, highlightthickness=1, highlightbackground="#313244")
         settings_frame.pack(fill="x", padx=15, pady=(0, 8))
 
-        tk.Label(
-            settings_frame,
-            text="🏷️ Drive Name:",
-            bg="#1e1e2e",
-            fg="#a6adc8",
-            font=("Segoe UI", 9, "bold")
-        ).pack(side="left", padx=(0, 6))
+        tk.Label(settings_frame, text="🏷️ Drive Name:", bg="#1e1e2e", fg="#a6adc8", font=("Segoe UI", 9, "bold")).pack(side="left", padx=(0, 6))
 
         self.drive_name_entry = tk.Entry(
-            settings_frame,
-            bg="#181825",
-            fg="#cdd6f4",
-            insertbackground="#cdd6f4",
-            font=("Segoe UI", 9, "bold"),
-            relief="flat",
-            highlightthickness=1,
-            highlightbackground="#313244",
-            width=20
+            settings_frame, bg="#181825", fg="#cdd6f4", insertbackground="#cdd6f4",
+            font=("Segoe UI", 9, "bold"), relief="flat", highlightthickness=1, highlightbackground="#313244", width=20
         )
         self.drive_name_entry.insert(0, self.get_current_drive_name())
         self.drive_name_entry.pack(side="left", padx=(0, 8))
 
         btn_rename = DarkButton(
-            settings_frame,
-            text="✏️ Save & Remount Drive",
-            command=self.action_rename_drive,
-            bg="#f9e2af", fg="#11111b", hover_bg="#fae3b0",
-            font=("Segoe UI", 8, "bold"), padx=10, pady=4
+            settings_frame, text="✏️ Save & Remount Drive", command=self.action_rename_drive,
+            bg="#f9e2af", fg="#11111b", hover_bg="#fae3b0", font=("Segoe UI", 8, "bold"), padx=10, pady=4
         )
         btn_rename.pack(side="left")
 
     def create_speed_cards(self):
-        cards_frame = tk.Frame(self.root, bg="#181825", padx=15, pady=5)
+        cards_frame = tk.Frame(self.content_frame, bg="#181825", padx=15, pady=5)
         cards_frame.pack(fill="x")
 
         # Upload Speed Card
-        up_card = tk.Frame(cards_frame, bg="#1e1e2e", padx=14, pady=12, highlightthickness=1, highlightbackground="#313244")
+        up_card = tk.Frame(cards_frame, bg="#1e1e2e", padx=14, pady=10, highlightthickness=1, highlightbackground="#313244")
         up_card.pack(side="left", fill="both", expand=True, padx=(0, 7))
 
         tk.Label(up_card, text="⬆️ UPLOAD SPEED", bg="#1e1e2e", fg="#a6adc8", font=("Segoe UI", 9, "bold")).pack(anchor="w")
-        self.up_speed_lbl = tk.Label(up_card, text="0.0 KB/s", bg="#1e1e2e", fg="#a6e3a1", font=("Segoe UI", 18, "bold"))
+        self.up_speed_lbl = tk.Label(up_card, text="0.0 KB/s", bg="#1e1e2e", fg="#a6e3a1", font=("Segoe UI", 16, "bold"))
         self.up_speed_lbl.pack(anchor="w", pady=(2, 0))
         self.up_total_lbl = tk.Label(up_card, text="Total Uploaded: 0 MB", bg="#1e1e2e", fg="#bac2de", font=("Segoe UI", 9))
         self.up_total_lbl.pack(anchor="w")
 
         # Download Speed Card
-        down_card = tk.Frame(cards_frame, bg="#1e1e2e", padx=14, pady=12, highlightthickness=1, highlightbackground="#313244")
+        down_card = tk.Frame(cards_frame, bg="#1e1e2e", padx=14, pady=10, highlightthickness=1, highlightbackground="#313244")
         down_card.pack(side="right", fill="both", expand=True, padx=(7, 0))
 
         tk.Label(down_card, text="⬇️ DOWNLOAD SPEED", bg="#1e1e2e", fg="#a6adc8", font=("Segoe UI", 9, "bold")).pack(anchor="w")
-        self.down_speed_lbl = tk.Label(down_card, text="0.0 KB/s", bg="#1e1e2e", fg="#89b4fa", font=("Segoe UI", 18, "bold"))
+        self.down_speed_lbl = tk.Label(down_card, text="0.0 KB/s", bg="#1e1e2e", fg="#89b4fa", font=("Segoe UI", 16, "bold"))
         self.down_speed_lbl.pack(anchor="w", pady=(2, 0))
         self.down_total_lbl = tk.Label(down_card, text="Total Downloaded: 0 MB", bg="#1e1e2e", fg="#bac2de", font=("Segoe UI", 9))
         self.down_total_lbl.pack(anchor="w")
 
     def create_transfer_queue(self):
-        queue_frame = tk.Frame(self.root, bg="#1e1e2e", padx=12, pady=10, highlightthickness=1, highlightbackground="#313244")
+        queue_frame = tk.Frame(self.content_frame, bg="#1e1e2e", padx=12, pady=10, highlightthickness=1, highlightbackground="#313244")
         queue_frame.pack(fill="x", padx=15, pady=(5, 10))
 
         tk.Label(queue_frame, text="⚡ ACTIVE TRANSFERS", bg="#1e1e2e", fg="#a6adc8", font=("Segoe UI", 9, "bold")).pack(anchor="w", pady=(0, 4))
@@ -277,7 +437,6 @@ class CloudNASApp:
         self.active_file_lbl = tk.Label(queue_frame, text="No active file transfers", bg="#1e1e2e", fg="#cdd6f4", font=("Segoe UI", 9), anchor="w")
         self.active_file_lbl.pack(fill="x")
 
-        # Custom canvas progress bar
         self.progress_canvas = tk.Canvas(queue_frame, bg="#313244", height=8, highlightthickness=0)
         self.progress_canvas.pack(fill="x", pady=(6, 0))
         self.progress_rect = self.progress_canvas.create_rectangle(0, 0, 0, 8, fill="#89b4fa", width=0)
@@ -290,38 +449,29 @@ class CloudNASApp:
         self.progress_canvas.coords(self.progress_rect, 0, 0, target_w, 8)
 
     def create_action_toolbar(self):
-        toolbar_frame = tk.Frame(self.root, bg="#181825", padx=15, pady=5)
+        toolbar_frame = tk.Frame(self.content_frame, bg="#181825", padx=15, pady=5)
         toolbar_frame.pack(fill="x")
 
-        # Refresh Button
         btn_refresh = DarkButton(
-            toolbar_frame, 
-            text="🔄 Refresh Data", 
-            command=self.action_refresh_data,
+            toolbar_frame, text="🔄 Refresh Data", command=self.action_refresh_data,
             bg="#89b4fa", fg="#11111b", hover_bg="#74c7ec"
         )
         btn_refresh.pack(side="left", padx=(0, 8))
 
-        # Push Button
         btn_push = DarkButton(
-            toolbar_frame, 
-            text="⬆️ Push (Sync Local -> GCS)", 
-            command=self.action_push,
+            toolbar_frame, text="⬆️ Push (Sync Local -> GCS)", command=self.action_push,
             bg="#a6e3a1", fg="#11111b", hover_bg="#94e2d5"
         )
         btn_push.pack(side="left", padx=(0, 8))
 
-        # Pull Button
         btn_pull = DarkButton(
-            toolbar_frame, 
-            text="⬇️ Pull (Sync GCS -> Local)", 
-            command=self.action_pull,
+            toolbar_frame, text="⬇️ Pull (Sync GCS -> Local)", command=self.action_pull,
             bg="#cba6f7", fg="#11111b", hover_bg="#f5c2e7"
         )
         btn_pull.pack(side="left")
 
     def create_log_console(self):
-        console_frame = tk.Frame(self.root, bg="#181825", padx=15, pady=10)
+        console_frame = tk.Frame(self.content_frame, bg="#181825", padx=15, pady=10)
         console_frame.pack(fill="both", expand=True)
 
         log_header_frame = tk.Frame(console_frame, bg="#181825")
@@ -330,32 +480,156 @@ class CloudNASApp:
         tk.Label(log_header_frame, text="📋 LIVE ACTIVITY & FILE LOG", bg="#181825", fg="#a6adc8", font=("Segoe UI", 9, "bold")).pack(side="left")
 
         btn_clear = DarkButton(
-            log_header_frame,
-            text="🧹 Clear Logs",
-            command=self.action_clear_log,
-            bg="#313244", fg="#cdd6f4", hover_bg="#45475a",
-            font=("Segoe UI", 8, "bold"), padx=10, pady=3
+            log_header_frame, text="🧹 Clear Logs", command=self.action_clear_log,
+            bg="#313244", fg="#cdd6f4", hover_bg="#45475a", font=("Segoe UI", 8, "bold"), padx=10, pady=3
         )
         btn_clear.pack(side="right")
 
         self.log_box = tk.Text(
-            console_frame, 
-            bg="#1e1e2e", 
-            fg="#a6adc8", 
-            insertbackground="#cdd6f4", 
-            font=("Consolas", 9),
-            relief="flat", 
-            highlightthickness=1, 
-            highlightbackground="#313244"
+            console_frame, bg="#1e1e2e", fg="#a6adc8", insertbackground="#cdd6f4",
+            font=("Consolas", 9), relief="flat", highlightthickness=1, highlightbackground="#313244"
         )
         self.log_box.pack(fill="both", expand=True)
         self.log("Cloud NAS Control Center initialized. Watching file activity...")
 
     def log(self, message):
-        now = datetime.now().strftime("%H:%M:%S")
-        self.log_box.insert("end", f"[{now}] {message}\n")
-        self.log_box.see("end")
+        if hasattr(self, "log_box"):
+            now = datetime.now().strftime("%H:%M:%S")
+            self.log_box.insert("end", f"[{now}] {message}\n")
+            self.log_box.see("end")
 
+    # ==========================================
+    # 👥 TAB 2: USERS & PERMISSIONS MANAGER
+    # ==========================================
+    def render_users_tab(self):
+        container = tk.Frame(self.content_frame, bg="#181825", padx=15, pady=10)
+        container.pack(fill="both", expand=True)
+
+        # Add New User Form Card
+        add_card = tk.Frame(container, bg="#1e1e2e", padx=15, pady=12, highlightthickness=1, highlightbackground="#313244")
+        add_card.pack(fill="x", pady=(0, 15))
+
+        tk.Label(add_card, text="➕ ADD NEW USER & ACCESS PERMISSION", bg="#1e1e2e", fg="#cdd6f4", font=("Segoe UI", 10, "bold")).pack(anchor="w", pady=(0, 8))
+
+        form_fields = tk.Frame(add_card, bg="#1e1e2e")
+        form_fields.pack(fill="x")
+
+        # Username
+        col1 = tk.Frame(form_fields, bg="#1e1e2e")
+        col1.pack(side="left", padx=(0, 10))
+        tk.Label(col1, text="Username:", bg="#1e1e2e", fg="#a6adc8", font=("Segoe UI", 8, "bold")).pack(anchor="w")
+        self.new_uname_entry = tk.Entry(col1, bg="#181825", fg="#cdd6f4", insertbackground="#cdd6f4", font=("Segoe UI", 9), relief="flat", highlightthickness=1, highlightbackground="#313244", width=16)
+        self.new_uname_entry.pack()
+
+        # Password
+        col2 = tk.Frame(form_fields, bg="#1e1e2e")
+        col2.pack(side="left", padx=(0, 10))
+        tk.Label(col2, text="Password:", bg="#1e1e2e", fg="#a6adc8", font=("Segoe UI", 8, "bold")).pack(anchor="w")
+        self.new_pass_entry = tk.Entry(col2, bg="#181825", fg="#cdd6f4", insertbackground="#cdd6f4", font=("Segoe UI", 9), relief="flat", highlightthickness=1, highlightbackground="#313244", width=14)
+        self.new_pass_entry.pack()
+
+        # Permission Selector
+        col3 = tk.Frame(form_fields, bg="#1e1e2e")
+        col3.pack(side="left", padx=(0, 10))
+        tk.Label(col3, text="Permission Level:", bg="#1e1e2e", fg="#a6adc8", font=("Segoe UI", 8, "bold")).pack(anchor="w")
+        
+        self.perm_var = tk.StringVar(value="Full Access (Read/Write)")
+        perm_opt = tk.OptionMenu(col3, self.perm_var, "Full Access (Read/Write)", "Read-Only", "Restricted Access")
+        perm_opt.config(bg="#181825", fg="#cdd6f4", activebackground="#313244", font=("Segoe UI", 8), highlightthickness=0)
+        perm_opt["menu"].config(bg="#1e1e2e", fg="#cdd6f4")
+        perm_opt.pack()
+
+        # Save Button
+        btn_add = DarkButton(
+            form_fields, text="Save User", command=self.handle_add_user,
+            bg="#a6e3a1", fg="#11111b", hover_bg="#94e2d5", font=("Segoe UI", 8, "bold"), padx=12, pady=3
+        )
+        btn_add.pack(side="left", pady=(14, 0))
+
+        # Users List Header & Table
+        tk.Label(container, text="👥 SYSTEM USERS & ROLE PERMISSIONS", bg="#181825", fg="#a6adc8", font=("Segoe UI", 9, "bold")).pack(anchor="w", pady=(0, 6))
+
+        self.users_list_frame = tk.Frame(container, bg="#1e1e2e", padx=10, pady=10, highlightthickness=1, highlightbackground="#313244")
+        self.users_list_frame.pack(fill="both", expand=True)
+
+        self.render_users_table()
+
+    def render_users_table(self):
+        for widget in self.users_list_frame.winfo_children():
+            widget.destroy()
+
+        # Table Headers
+        headers_frame = tk.Frame(self.users_list_frame, bg="#313244", padx=8, pady=5)
+        headers_frame.pack(fill="x", pady=(0, 5))
+
+        tk.Label(headers_frame, text="USERNAME", bg="#313244", fg="#cdd6f4", font=("Segoe UI", 8, "bold"), width=18, anchor="w").pack(side="left")
+        tk.Label(headers_frame, text="ROLE", bg="#313244", fg="#cdd6f4", font=("Segoe UI", 8, "bold"), width=10, anchor="w").pack(side="left")
+        tk.Label(headers_frame, text="PERMISSION", bg="#313244", fg="#cdd6f4", font=("Segoe UI", 8, "bold"), width=24, anchor="w").pack(side="left")
+        tk.Label(headers_frame, text="CREATED AT", bg="#313244", fg="#cdd6f4", font=("Segoe UI", 8, "bold"), width=16, anchor="w").pack(side="left")
+        tk.Label(headers_frame, text="ACTION", bg="#313244", fg="#cdd6f4", font=("Segoe UI", 8, "bold"), width=10, anchor="w").pack(side="left")
+
+        # Table Rows
+        users = self.users_data.get("users", [])
+        for idx, u in enumerate(users):
+            row_bg = "#1e1e2e" if idx % 2 == 0 else "#181825"
+            row = tk.Frame(self.users_list_frame, bg=row_bg, padx=8, pady=4)
+            row.pack(fill="x")
+
+            uname = u["username"]
+            role = u.get("role", "User")
+            perm = u.get("permission", "Full Access")
+            created = u.get("created_at", "-")
+
+            tk.Label(row, text=uname, bg=row_bg, fg="#cdd6f4", font=("Segoe UI", 9, "bold"), width=18, anchor="w").pack(side="left")
+            tk.Label(row, text=role, bg=row_bg, fg="#89b4fa", font=("Segoe UI", 8, "bold"), width=10, anchor="w").pack(side="left")
+            tk.Label(row, text=perm, bg=row_bg, fg="#a6e3a1" if "Full" in perm else "#f9e2af", font=("Segoe UI", 8), width=24, anchor="w").pack(side="left")
+            tk.Label(row, text=created, bg=row_bg, fg="#bac2de", font=("Segoe UI", 8), width=16, anchor="w").pack(side="left")
+
+            if uname != "admin":
+                btn_del = DarkButton(
+                    row, text="🗑️ Delete", command=lambda name=uname: self.handle_delete_user(name),
+                    bg="#f38ba8", fg="#11111b", hover_bg="#e57497", font=("Segoe UI", 7, "bold"), padx=6, pady=2
+                )
+                btn_del.pack(side="left")
+            else:
+                tk.Label(row, text="System", bg=row_bg, fg="#a6adc8", font=("Segoe UI", 8, "italic"), width=10, anchor="w").pack(side="left")
+
+    def handle_add_user(self):
+        uname = self.new_uname_entry.get().strip()
+        pword = self.new_pass_entry.get().strip()
+        perm = self.perm_var.get()
+
+        if not uname or not pword:
+            return
+
+        # Check duplicate
+        for u in self.users_data.get("users", []):
+            if u["username"] == uname:
+                return
+
+        new_u = {
+            "username": uname,
+            "password": pword,
+            "role": "User",
+            "permission": perm,
+            "created_at": datetime.now().strftime("%Y-%m-%d %H:%M")
+        }
+
+        self.users_data["users"].append(new_u)
+        self.save_users_data()
+
+        self.new_uname_entry.delete(0, "end")
+        self.new_pass_entry.delete(0, "end")
+        self.render_users_table()
+
+    def handle_delete_user(self, username):
+        self.users_data["users"] = [u for u in self.users_data.get("users", []) if u["username"] != username]
+        self.save_users_data()
+        self.render_users_table()
+
+    # ==========================================
+    # ⚡ API & POLLER HELPERS
+    # ==========================================
     def api_post(self, endpoint, params=None):
         try:
             url = f"{RC_URL}/{endpoint}"
@@ -371,45 +645,49 @@ class CloudNASApp:
             stats = self.api_post("core/stats")
             if stats:
                 self.mounted = True
-                self.root.after(0, self.update_ui_stats, stats)
+                if hasattr(self, "status_badge") and self.status_badge.winfo_exists():
+                    self.root.after(0, self.update_ui_stats, stats)
             else:
                 self.mounted = False
-                self.root.after(0, self.update_ui_disconnected)
+                if hasattr(self, "status_badge") and self.status_badge.winfo_exists():
+                    self.root.after(0, self.update_ui_disconnected)
             time.sleep(1)
 
     def update_ui_stats(self, stats):
-        self.status_badge.config(text="● ONLINE & MOUNTED", bg="#a6e3a1", fg="#11111b")
+        if hasattr(self, "status_badge") and self.status_badge.winfo_exists():
+            self.status_badge.config(text="● ONLINE & MOUNTED", bg="#a6e3a1", fg="#11111b")
 
-        speed_bytes = stats.get("speed", 0)
-        speed_kb = speed_bytes / 1024.0
-        bytes_total = stats.get("bytes", 0)
-        mb_total = bytes_total / (1024.0 * 1024.0)
+        if self.active_tab == "dashboard" and hasattr(self, "up_speed_lbl"):
+            speed_bytes = stats.get("speed", 0)
+            speed_kb = speed_bytes / 1024.0
+            bytes_total = stats.get("bytes", 0)
+            mb_total = bytes_total / (1024.0 * 1024.0)
 
-        # Update Upload Speed Display
-        self.up_speed_lbl.config(text=f"{speed_kb:.1f} KB/s")
-        self.up_total_lbl.config(text=f"Total Uploaded: {mb_total:.2f} MB")
+            self.up_speed_lbl.config(text=f"{speed_kb:.1f} KB/s")
+            self.up_total_lbl.config(text=f"Total Uploaded: {mb_total:.2f} MB")
 
-        # Active Transfers Queue & Log syncing files
-        transfers = stats.get("transferring", [])
-        if transfers:
-            active_file = transfers[0].get("name", "Syncing...")
-            pct = transfers[0].get("percentage", 0)
-            self.active_file_lbl.config(text=f"Syncing: {active_file} ({pct}%)")
-            self.set_progress(pct)
+            transfers = stats.get("transferring", [])
+            if transfers:
+                active_file = transfers[0].get("name", "Syncing...")
+                pct = transfers[0].get("percentage", 0)
+                self.active_file_lbl.config(text=f"Syncing: {active_file} ({pct}%)")
+                self.set_progress(pct)
 
-            if active_file not in self.tracked_transfers:
-                self.tracked_transfers.add(active_file)
-                self.log(f"📤 Syncing Cloud File: {active_file}")
-        else:
-            self.active_file_lbl.config(text="Idle - All files fully synchronized")
-            self.set_progress(100)
+                if active_file not in self.tracked_transfers:
+                    self.tracked_transfers.add(active_file)
+                    self.log(f"📤 Syncing Cloud File: {active_file}")
+            else:
+                self.active_file_lbl.config(text="Idle - All files fully synchronized")
+                self.set_progress(100)
 
     def update_ui_disconnected(self):
-        self.status_badge.config(text="● DISCONNECTED / UNMOUNTED", bg="#f38ba8", fg="#11111b")
-        self.up_speed_lbl.config(text="0.0 KB/s")
-        self.down_speed_lbl.config(text="0.0 KB/s")
-        self.active_file_lbl.config(text="Cloud NAS is not currently mounted.")
-        self.set_progress(0)
+        if hasattr(self, "status_badge") and self.status_badge.winfo_exists():
+            self.status_badge.config(text="● DISCONNECTED / UNMOUNTED", bg="#f38ba8", fg="#11111b")
+        if self.active_tab == "dashboard" and hasattr(self, "up_speed_lbl"):
+            self.up_speed_lbl.config(text="0.0 KB/s")
+            self.down_speed_lbl.config(text="0.0 KB/s")
+            self.active_file_lbl.config(text="Cloud NAS is not currently mounted.")
+            self.set_progress(0)
 
     def action_rename_drive(self):
         new_name = self.drive_name_entry.get().strip()

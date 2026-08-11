@@ -3,6 +3,7 @@
 
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 CONFIG_FILE="$SCRIPT_DIR/drive_config.json"
+USERS_FILE="$SCRIPT_DIR/users_permissions.json"
 PLIST_PATH="$HOME/Library/LaunchAgents/com.cloudnas.controlcenter.plist"
 APP_DIR="$HOME/Applications/Cloud NAS.app"
 RCLONE_BIN="$SCRIPT_DIR/rclone"
@@ -61,7 +62,7 @@ echo "[INFO] Removing GCS remote configuration..."
 
 # 6. Remove Mount Directories & Config
 rm -rf "$HOME/$VOL_NAME" "$HOME/CloudNAS" "$HOME/Cloud NAS" "$HOME/NAS" >/dev/null 2>&1
-rm -f "$CONFIG_FILE" >/dev/null 2>&1
+rm -f "$CONFIG_FILE" "$USERS_FILE" >/dev/null 2>&1
 
 echo "============================================================"
 echo "[SUCCESS] Cloud NAS has been completely purged from this Mac!"
