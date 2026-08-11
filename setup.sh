@@ -54,7 +54,7 @@ echo "[OK] Rclone Binary Ready: $RCLONE_BIN"
 echo "[INFO] Configuring Rclone..."
 "$RCLONE_BIN" config create "$REMOTE_NAME" googlecloudstorage service_account_file "$KEY_FILE" bucket_policy_only true >/dev/null 2>&1
 
-# Mount Drive
+# Prepare Mount Point Directory
 echo "[INFO] Mounting Cloud NAS ($VOL_NAME) to $MOUNT_POINT..."
 pkill -9 -f "rclone mount" >/dev/null 2>&1
 if [ -d "$MOUNT_POINT" ]; then
@@ -63,13 +63,13 @@ if [ -d "$MOUNT_POINT" ]; then
 fi
 mkdir -p "$MOUNT_POINT"
 
-# Launch rclone in background via nohup with instant directory deletion support
+# Launch rclone in background via nohup
 nohup "$RCLONE_BIN" mount "$REMOTE_NAME:$BUCKET_NAME" "$MOUNT_POINT" \
     --vfs-cache-mode full \
     --vfs-cache-max-size 10G \
     --vfs-cache-max-age 24h \
     --vfs-write-back 1s \
-    --vfs-dir-cache-time 10s \
+    --dir-cache-time 10s \
     --attr-timeout 1s \
     --allow-non-empty \
     --gcs-bucket-policy-only \

@@ -41,7 +41,7 @@ nohup "$RCLONE_BIN" mount "$REMOTE_NAME:$BUCKET_NAME" "$MOUNT_POINT" \
     --vfs-cache-max-size 10G \
     --vfs-cache-max-age 24h \
     --vfs-write-back 1s \
-    --vfs-dir-cache-time 10s \
+    --dir-cache-time 10s \
     --attr-timeout 1s \
     --allow-non-empty \
     --gcs-bucket-policy-only \
