@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 """
-Cloud NAS Desktop Control Center & Live Monitor
+Cloud NAS Desktop Control Center, Live Monitor & GCS Live Chat
 Provides Admin Authentication, Folder-Level Scoping & Permission Enforcement, Real-time Speeds,
-Transfer Queue, Push/Pull/Refresh buttons, Drive Renaming, and Live File Activity Logging.
+Transfer Queue, Push/Pull/Refresh buttons, Drive Renaming, Live File Activity Logging,
+and Cloud Storage-backed Real-time Live Chat with Desktop Notifications.
 Pure Tkinter custom widgets for 100% reliable dark mode rendering on macOS & Windows.
 """
 
@@ -58,9 +59,9 @@ class DarkButton(tk.Label):
 class CloudNASApp:
     def __init__(self, root):
         self.root = root
-        self.root.title("Cloud NAS - Control Center & Permissions Manager")
-        self.root.geometry("700x640")
-        self.root.minsize(660, 540)
+        self.root.title("Cloud NAS - Control Center, Permissions & Live Chat")
+        self.root.geometry("740x660")
+        self.root.minsize(700, 560)
         self.root.configure(bg="#181825")  # Dark Catppuccin Base
 
         # Apply Window Icon if available
@@ -78,6 +79,11 @@ class CloudNASApp:
         self.mounted = False
         self.tracked_transfers = set()
         self.active_tab = "dashboard"
+        
+        # Chat State Variables
+        self.active_chat_recipient = None
+        self.unread_counts = {}
+        self.chat_history_cache = {}
 
         # Load / Initialize Users Database
         self.load_users_data()
@@ -301,6 +307,10 @@ class CloudNASApp:
         self.fs_thread = threading.Thread(target=self.fs_watcher_loop, daemon=True)
         self.fs_thread.start()
 
+        # Start GCS Live Chat Poller Engine
+        self.chat_thread = threading.Thread(target=self.chat_poller_loop, daemon=True)
+        self.chat_thread.start()
+
     def create_header(self):
         header_frame = tk.Frame(self.root, bg="#181825", padx=15, pady=10)
         header_frame.pack(fill="x")
@@ -373,13 +383,22 @@ class CloudNASApp:
         tab_frame.pack(fill="x", pady=(0, 5))
 
         self.btn_tab_dashboard = DarkButton(
-            tab_frame, text="📊 Live Dashboard & Storage", command=self.switch_to_dashboard,
+            tab_frame, text="📊 Live Dashboard", command=self.switch_to_dashboard,
             bg="#89b4fa", fg="#11111b", hover_bg="#74c7ec", font=("Segoe UI", 9, "bold"), padx=14, pady=5
         )
         self.btn_tab_dashboard.pack(side="left", padx=(0, 6))
 
-        # Show Users & Permissions tab if Admin or Full Access
-        is_admin = self.logged_in_user and (self.logged_in_user.get("role") == "Admin" or self.logged_in_user.get("username") == "admin")
+        total_unread = sum(self.unread_counts.values())
+        chat_title = f"💬 Live Chat ({total_unread})" if total_unread > 0 else "💬 Live Chat"
+
+        self.btn_tab_chat = DarkButton(
+            tab_frame, text=chat_title, command=self.switch_to_chat,
+            bg="#313244", fg="#cdd6f4", hover_bg="#45475a", font=("Segoe UI", 9, "bold"), padx=14, pady=5
+        )
+        self.btn_tab_chat.pack(side="left", padx=(0, 6))
+
+        # Show Users & Permissions tab if Admin
+        is_admin = self.logged_in_user and (self.logged_in_user.get("role") == "Admin" or self.logged_in_user.get("username").lower() == "admin")
         if is_admin:
             self.btn_tab_users = DarkButton(
                 tab_frame, text="👥 Users & Permissions", command=self.switch_to_users,
@@ -387,20 +406,41 @@ class CloudNASApp:
             )
             self.btn_tab_users.pack(side="left")
 
+    def update_chat_tab_badge(self):
+        total_unread = sum(self.unread_counts.values())
+        chat_title = f"💬 Live Chat ({total_unread})" if total_unread > 0 else "💬 Live Chat"
+        if hasattr(self, "btn_tab_chat") and self.btn_tab_chat.winfo_exists():
+            if self.active_tab == "chat":
+                self.btn_tab_chat.config(text=chat_title, bg="#a6e3a1", fg="#11111b")
+            else:
+                self.btn_tab_chat.config(text=chat_title, bg="#313244", fg="#cdd6f4")
+
     def switch_to_dashboard(self):
         self.active_tab = "dashboard"
         self.btn_tab_dashboard.config(bg="#89b4fa", fg="#11111b")
+        self.update_chat_tab_badge()
         if hasattr(self, "btn_tab_users"):
             self.btn_tab_users.config(bg="#313244", fg="#cdd6f4")
         for widget in self.content_frame.winfo_children():
             widget.destroy()
         self.render_dashboard_tab()
 
+    def switch_to_chat(self):
+        self.active_tab = "chat"
+        self.btn_tab_dashboard.config(bg="#313244", fg="#cdd6f4")
+        self.btn_tab_chat.config(bg="#a6e3a1", fg="#11111b")
+        if hasattr(self, "btn_tab_users"):
+            self.btn_tab_users.config(bg="#313244", fg="#cdd6f4")
+        for widget in self.content_frame.winfo_children():
+            widget.destroy()
+        self.render_chat_tab()
+
     def switch_to_users(self):
         self.active_tab = "users"
         if hasattr(self, "btn_tab_users"):
             self.btn_tab_users.config(bg="#cba6f7", fg="#11111b")
         self.btn_tab_dashboard.config(bg="#313244", fg="#cdd6f4")
+        self.update_chat_tab_badge()
         for widget in self.content_frame.winfo_children():
             widget.destroy()
         self.render_users_tab()
@@ -629,7 +669,256 @@ class CloudNASApp:
             self.log_box.see("end")
 
     # ==========================================
-    # 👥 TAB 2: USERS & PERMISSIONS MANAGER
+    # 💬 TAB 2: GCS CLOUD LIVE CHAT & NOTIFICATIONS
+    # ==========================================
+    def get_chat_filename(self, user1, user2):
+        u1 = str(user1).lower().strip()
+        u2 = str(user2).lower().strip()
+        pair = sorted([u1, u2])
+        return f"{pair[0]}_{pair[1]}.json"
+
+    def fetch_chat_history(self, user1, user2):
+        chat_file = self.get_chat_filename(user1, user2)
+        remote_target = f"gcsnas:sv-school/.sys/chats/{chat_file}"
+        rclone_bin = os.path.join(SCRIPT_DIR, "rclone")
+        if not os.path.exists(rclone_bin):
+            rclone_bin = "rclone"
+
+        try:
+            res = subprocess.run([rclone_bin, "cat", remote_target], capture_output=True, text=True, timeout=4)
+            if res.returncode == 0 and res.stdout.strip():
+                data = json.loads(res.stdout)
+                return data.get("messages", [])
+        except Exception:
+            pass
+        return []
+
+    def send_chat_message(self, recipient_username, text):
+        if not text.strip() or not self.logged_in_user:
+            return
+        
+        sender = self.logged_in_user.get("username", "User")
+        chat_file = self.get_chat_filename(sender, recipient_username)
+        remote_target = f"gcsnas:sv-school/.sys/chats/{chat_file}"
+        
+        history = self.fetch_chat_history(sender, recipient_username)
+        new_msg = {
+            "sender": sender,
+            "recipient": recipient_username,
+            "text": text.strip(),
+            "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        }
+        history.append(new_msg)
+        
+        tmp_local = os.path.join(SCRIPT_DIR, f"temp_{chat_file}")
+        try:
+            with open(tmp_local, "w") as f:
+                json.dump({"messages": history}, f, indent=2)
+            
+            rclone_bin = os.path.join(SCRIPT_DIR, "rclone")
+            if not os.path.exists(rclone_bin):
+                rclone_bin = "rclone"
+            
+            def _push():
+                subprocess.run([rclone_bin, "copyto", tmp_local, remote_target], capture_output=True, timeout=8)
+                if os.path.exists(tmp_local):
+                    os.remove(tmp_local)
+                if self.active_tab == "chat" and self.active_chat_recipient == recipient_username:
+                    self.root.after(0, self.load_active_chat_messages)
+
+            threading.Thread(target=_push, daemon=True).start()
+        except Exception as e:
+            print(f"Error sending chat message: {e}")
+
+    def send_desktop_notification(self, title, message):
+        """Triggers native desktop popups on macOS & Windows."""
+        try:
+            if IS_MAC:
+                clean_title = title.replace('"', '\\"')
+                clean_msg = message.replace('"', '\\"')
+                cmd = f'display notification "{clean_msg}" with title "{clean_title}"'
+                subprocess.run(["osascript", "-e", cmd], capture_output=True)
+            elif IS_WIN:
+                ps_cmd = f'[reflection.assembly]::loadwithpartialname("System.Windows.Forms"); [System.Windows.Forms.MessageBox]::Show("{message}", "{title}")'
+                subprocess.run(["powershell", "-Command", ps_cmd], capture_output=True)
+        except Exception:
+            pass
+
+    def chat_poller_loop(self):
+        """Polls GCS chat store every 3 seconds for live incoming messages."""
+        last_seen_count = {}
+        
+        while self.is_monitoring:
+            time.sleep(3.0)
+            if not self.logged_in_user:
+                continue
+
+            current_u = self.logged_in_user.get("username", "").lower()
+            all_users = [u["username"] for u in self.users_data.get("users", []) if u["username"].lower() != current_u]
+
+            for other_u in all_users:
+                messages = self.fetch_chat_history(current_u, other_u)
+                chat_id = self.get_chat_filename(current_u, other_u)
+                
+                prev_count = last_seen_count.get(chat_id, None)
+                curr_count = len(messages)
+                
+                if prev_count is not None and curr_count > prev_count:
+                    new_msgs = messages[prev_count:]
+                    for msg in new_msgs:
+                        sender = msg.get("sender", "User")
+                        if sender and sender.lower() != current_u:
+                            text = msg.get("text", "")
+                            
+                            # Increment unread badge count if not actively reading
+                            if self.active_tab != "chat" or self.active_chat_recipient != other_u:
+                                self.unread_counts[other_u] = self.unread_counts.get(other_u, 0) + 1
+                                self.root.after(0, self.update_chat_tab_badge)
+
+                            # Send Desktop Notification
+                            self.root.after(0, self.send_desktop_notification, f"💬 Message from {sender}", text)
+                            
+                            # Log to console
+                            if hasattr(self, "log_box"):
+                                self.root.after(0, self.log, f"💬 Live Chat message from {sender}: '{text}'")
+
+                            # Refresh chat window if currently open
+                            if self.active_tab == "chat" and self.active_chat_recipient == other_u:
+                                self.root.after(0, self.load_active_chat_messages)
+
+                last_seen_count[chat_id] = curr_count
+
+    def render_chat_tab(self):
+        container = tk.Frame(self.content_frame, bg="#181825", padx=15, pady=10)
+        container.pack(fill="both", expand=True)
+
+        # Left Column: Contacts List Sidebar
+        contacts_sidebar = tk.Frame(container, bg="#1e1e2e", width=200, highlightthickness=1, highlightbackground="#313244")
+        contacts_sidebar.pack(side="left", fill="y", padx=(0, 10))
+
+        tk.Label(contacts_sidebar, text="👥 CONTACTS", bg="#1e1e2e", fg="#a6adc8", font=("Segoe UI", 9, "bold"), padx=12, pady=10).pack(anchor="w")
+
+        self.contacts_list_frame = tk.Frame(contacts_sidebar, bg="#1e1e2e")
+        self.contacts_list_frame.pack(fill="both", expand=True)
+
+        # Right Column: Live Chat Window & Input
+        self.chat_window_frame = tk.Frame(container, bg="#1e1e2e", highlightthickness=1, highlightbackground="#313244")
+        self.chat_window_frame.pack(side="right", fill="both", expand=True)
+
+        self.render_contacts_list()
+
+        # Auto-select first contact if none selected
+        current_u = self.logged_in_user.get("username", "").lower()
+        other_users = [u["username"] for u in self.users_data.get("users", []) if u["username"].lower() != current_u]
+        if other_users and not self.active_chat_recipient:
+            self.select_chat_contact(other_users[0])
+        elif self.active_chat_recipient:
+            self.select_chat_contact(self.active_chat_recipient)
+
+    def render_contacts_list(self):
+        for widget in self.contacts_list_frame.winfo_children():
+            widget.destroy()
+
+        current_u = self.logged_in_user.get("username", "").lower()
+        other_users = [u["username"] for u in self.users_data.get("users", []) if u["username"].lower() != current_u]
+
+        for u_name in other_users:
+            unread = self.unread_counts.get(u_name, 0)
+            badge = f" 🔴 ({unread})" if unread > 0 else ""
+            display_text = f"👤 {u_name}{badge}"
+            
+            is_active = (self.active_chat_recipient == u_name)
+            btn_bg = "#313244" if is_active else "#181825"
+            btn_fg = "#a6e3a1" if is_active else "#cdd6f4"
+
+            btn_contact = DarkButton(
+                self.contacts_list_frame, text=display_text, command=lambda name=u_name: self.select_chat_contact(name),
+                bg=btn_bg, fg=btn_fg, hover_bg="#45475a", font=("Segoe UI", 9, "bold"), padx=12, pady=8, anchor="w"
+            )
+            btn_contact.pack(fill="x", pady=2, padx=6)
+
+    def select_chat_contact(self, username):
+        self.active_chat_recipient = username
+        self.unread_counts[username] = 0
+        self.update_chat_tab_badge()
+        self.render_contacts_list()
+        
+        # Render Chat Thread Right Window
+        for widget in self.chat_window_frame.winfo_children():
+            widget.destroy()
+
+        header = tk.Frame(self.chat_window_frame, bg="#313244", padx=12, pady=8)
+        header.pack(fill="x")
+        tk.Label(header, text=f"💬 Chatting with {username}", bg="#313244", fg="#cdd6f4", font=("Segoe UI", 10, "bold")).pack(anchor="w")
+
+        # Chat Message History Box
+        self.chat_msg_box = tk.Text(
+            self.chat_window_frame, bg="#181825", fg="#cdd6f4", insertbackground="#cdd6f4",
+            font=("Segoe UI", 9), relief="flat", padx=10, pady=10, state="disabled"
+        )
+        self.chat_msg_box.pack(fill="both", expand=True)
+
+        self.chat_msg_box.tag_config("sent", foreground="#a6e3a1", font=("Segoe UI", 9, "bold"))
+        self.chat_msg_box.tag_config("received", foreground="#89b4fa", font=("Segoe UI", 9, "bold"))
+        self.chat_msg_box.tag_config("time", foreground="#a6adc8", font=("Segoe UI", 8, "italic"))
+
+        # Input Bar
+        input_frame = tk.Frame(self.chat_window_frame, bg="#1e1e2e", padx=10, pady=8)
+        input_frame.pack(fill="x")
+
+        self.chat_input_entry = tk.Entry(
+            input_frame, bg="#181825", fg="#cdd6f4", insertbackground="#cdd6f4",
+            font=("Segoe UI", 9), relief="flat", highlightthickness=1, highlightbackground="#313244"
+        )
+        self.chat_input_entry.pack(side="left", fill="x", expand=True, padx=(0, 8))
+        self.chat_input_entry.bind("<Return>", lambda e: self.handle_send_chat())
+
+        btn_send = DarkButton(
+            input_frame, text="🚀 Send", command=self.handle_send_chat,
+            bg="#89b4fa", fg="#11111b", hover_bg="#74c7ec", font=("Segoe UI", 8, "bold"), padx=12, pady=4
+        )
+        btn_send.pack(side="right")
+
+        self.load_active_chat_messages()
+
+    def handle_send_chat(self):
+        if not hasattr(self, "chat_input_entry"):
+            return
+        text = self.chat_input_entry.get().strip()
+        if text and self.active_chat_recipient:
+            self.chat_input_entry.delete(0, "end")
+            self.send_chat_message(self.active_chat_recipient, text)
+
+    def load_active_chat_messages(self):
+        if not self.active_chat_recipient or not hasattr(self, "chat_msg_box"):
+            return
+        
+        current_u = self.logged_in_user.get("username", "") if self.logged_in_user else ""
+        messages = self.fetch_chat_history(current_u, self.active_chat_recipient)
+
+        self.chat_msg_box.config(state="normal")
+        self.chat_msg_box.delete("1.0", "end")
+
+        if not messages:
+            self.chat_msg_box.insert("end", f"No previous messages with {self.active_chat_recipient}. Send a message to start chatting!\n", "time")
+        else:
+            for m in messages:
+                sender = m.get("sender", "User")
+                text = m.get("text", "")
+                tstamp = m.get("timestamp", "")
+
+                if sender.lower() == current_u.lower():
+                    self.chat_msg_box.insert("end", f"[{tstamp}] You: ", "sent")
+                    self.chat_msg_box.insert("end", f"{text}\n")
+                else:
+                    self.chat_msg_box.insert("end", f"[{tstamp}] {sender}: ", "received")
+                    self.chat_msg_box.insert("end", f"{text}\n")
+
+        self.chat_msg_box.see("end")
+        self.chat_msg_box.config(state="disabled")
+
+    # ==========================================
+    # 👥 TAB 3: USERS & PERMISSIONS MANAGER
     # ==========================================
     def render_users_tab(self):
         container = tk.Frame(self.content_frame, bg="#181825", padx=15, pady=10)
@@ -751,7 +1040,7 @@ class CloudNASApp:
             tk.Label(row, text=perm, bg=row_bg, fg="#a6e3a1" if "Write" in perm else "#f9e2af", font=("Segoe UI", 8), width=14, anchor="w").pack(side="left")
             tk.Label(row, text=created, bg=row_bg, fg="#bac2de", font=("Segoe UI", 8), width=14, anchor="w").pack(side="left")
 
-            if uname != "admin":
+            if uname.lower() != "admin":
                 btn_del = DarkButton(
                     row, text="🗑️ Delete", command=lambda name=uname: self.handle_delete_user(name),
                     bg="#f38ba8", fg="#11111b", hover_bg="#e57497", font=("Segoe UI", 7, "bold"), padx=6, pady=2
