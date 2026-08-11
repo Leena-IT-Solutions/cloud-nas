@@ -1,3 +1,4 @@
+#!/usr/bin/env bash
 #!/usr/bin/env python3
 """
 Cloud NAS Desktop Control Center & Live Monitor
@@ -255,7 +256,7 @@ class CloudNASApp:
     def action_pull(self):
         def _task():
             self.log("Triggering Pull: Fetching latest remote files from GCS...")
-            res = self.api_post("vfs/refresh", {"recursive": True})
+            res = self.api_post("vfs/refresh", {"recursive": "true"})
             if res:
                 self.log("✅ Pull completed! Remote storage view updated.")
             else:
