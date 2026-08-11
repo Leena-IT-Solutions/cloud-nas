@@ -13,6 +13,22 @@ set "RCLONE_BIN=%SCRIPT_DIR%\rclone.exe"
 set "MOUNT_VBS=%SCRIPT_DIR%\windows-mount-hidden.vbs"
 set "GUI_SCRIPT=%SCRIPT_DIR%\cloud_nas_gui.py"
 
+rem 0. Dynamically resolve absolute Python executable path on Windows
+set "PYTHON_EXE="
+for %%P in (pythonw.exe pyw.exe python.exe py.exe) do (
+    where %%P >nul 2>&1
+    if not errorlevel 1 (
+        for /f "delims=" %%I in ('where %%P') do (
+            if not defined PYTHON_EXE set "PYTHON_EXE=%%I"
+        )
+    )
+)
+
+if not defined PYTHON_EXE (
+    set "PYTHON_EXE=python.exe"
+)
+echo [OK] Using Python Executable: %PYTHON_EXE%
+
 rem 1. Check Key File
 if not exist "%KEY_FILE%" (
     echo [ERROR] GCP Key file leena-it-solutions-412315-f63f3bd287c1.json not found!
@@ -47,7 +63,7 @@ set "SHORTCUT_VBS=%TEMP%\create_shortcut.vbs"
 echo Set oWS = WScript.CreateObject("WScript.Shell") > "%SHORTCUT_VBS%"
 echo sLinkFile = "%STARTUP_FOLDER%\Cloud NAS Control Center.lnk" >> "%SHORTCUT_VBS%"
 echo Set oLink = oWS.CreateShortcut(sLinkFile) >> "%SHORTCUT_VBS%"
-echo oLink.TargetPath = "pythonw.exe" >> "%SHORTCUT_VBS%"
+echo oLink.TargetPath = "%PYTHON_EXE%" >> "%SHORTCUT_VBS%"
 echo oLink.Arguments = """%GUI_SCRIPT%""" >> "%SHORTCUT_VBS%"
 echo oLink.WorkingDirectory = "%SCRIPT_DIR%" >> "%SHORTCUT_VBS%"
 echo oLink.Save >> "%SHORTCUT_VBS%"
@@ -58,4 +74,4 @@ echo ============================================================
 echo [SUCCESS] Cloud NAS mounted (Z:) & installed to Windows Startup!
 echo ============================================================
 
-start "" pythonw "%GUI_SCRIPT%"
+start "" "%PYTHON_EXE%" "%GUI_SCRIPT%"
