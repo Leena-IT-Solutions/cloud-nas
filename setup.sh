@@ -87,6 +87,10 @@ APP_DIR="$HOME/Applications/Cloud NAS.app"
 mkdir -p "$APP_DIR/Contents/MacOS"
 mkdir -p "$APP_DIR/Contents/Resources"
 
+if [ -f "$SCRIPT_DIR/AppIcon.icns" ]; then
+    cp "$SCRIPT_DIR/AppIcon.icns" "$APP_DIR/Contents/Resources/AppIcon.icns"
+fi
+
 cat << EOF > "$APP_DIR/Contents/Info.plist"
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -94,6 +98,8 @@ cat << EOF > "$APP_DIR/Contents/Info.plist"
 <dict>
     <key>CFBundleExecutable</key>
     <string>Cloud NAS</string>
+    <key>CFBundleIconFile</key>
+    <string>AppIcon</string>
     <key>CFBundleIdentifier</key>
     <string>com.cloudnas.controlcenter</string>
     <key>CFBundleName</key>
@@ -112,7 +118,8 @@ exec /usr/bin/python3 "$SCRIPT_DIR/cloud_nas_gui.py"
 EOF
 
 chmod +x "$APP_DIR/Contents/MacOS/Cloud NAS"
-echo "[OK] Installed 'Cloud NAS' in macOS Applications & Launchpad!"
+touch "$APP_DIR"
+echo "[OK] Installed 'Cloud NAS' with custom 3D glass icon in macOS Applications & Launchpad!"
 
 # Launch Control Center GUI now
 python3 "$SCRIPT_DIR/cloud_nas_gui.py" &

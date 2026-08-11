@@ -84,10 +84,10 @@ echo WshShell.Run "pythonw.exe ""%SCRIPT_DIR%cloud_nas_gui.py""", 0, False >> "%
 
 echo [OK] Auto-mount on Windows boot enabled!
 
-:: 6. Create Start Menu Programs Shortcut
-echo [INFO] Creating Windows Start Menu Shortcut...
-powershell -Command "$s=(New-Object -COM WScript.Shell).CreateShortcut('$env:APPDATA\Microsoft\Windows\Start Menu\Programs\Cloud NAS.lnk'); $s.TargetPath='pythonw.exe'; $s.Arguments='""%SCRIPT_DIR%cloud_nas_gui.py""'; $s.WorkingDirectory='%SCRIPT_DIR%'; $s.Save()"
-echo [OK] Installed 'Cloud NAS' in Windows Start Menu!
+:: 6. Create Start Menu Programs Shortcut with custom icon
+echo [INFO] Creating Windows Start Menu Shortcut with custom app icon...
+powershell -Command "$s=(New-Object -COM WScript.Shell).CreateShortcut('$env:APPDATA\Microsoft\Windows\Start Menu\Programs\Cloud NAS.lnk'); $s.TargetPath='pythonw.exe'; $s.Arguments='""%SCRIPT_DIR%cloud_nas_gui.py""'; $s.WorkingDirectory='%SCRIPT_DIR%'; $s.IconLocation='%SCRIPT_DIR%app_icon.png'; $s.Save()"
+echo [OK] Installed 'Cloud NAS' with custom app icon in Windows Start Menu!
 
 :: 7. Launch Background Mount & Control Center GUI Now
 echo [INFO] Launching Cloud NAS Drive %DRIVE_LETTER% and Control Center GUI...

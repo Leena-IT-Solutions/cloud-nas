@@ -22,6 +22,7 @@ from datetime import datetime
 RC_URL = "http://127.0.0.1:5572"
 IS_MAC = platform.system() == "Darwin"
 IS_WIN = platform.system() == "Windows"
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 
 class CloudNASApp:
     def __init__(self, root):
@@ -30,6 +31,15 @@ class CloudNASApp:
         self.root.geometry("640x520")
         self.root.minsize(580, 480)
         self.root.configure(bg="#181825")  # Mocha Dark Theme
+
+        # Apply Window Icon if available
+        icon_path = os.path.join(SCRIPT_DIR, "app_icon.png")
+        if os.path.exists(icon_path):
+            try:
+                img = tk.PhotoImage(file=icon_path)
+                self.root.iconphoto(True, img)
+            except Exception:
+                pass
 
         # Apply custom dark theme styles
         self.setup_styles()
