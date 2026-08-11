@@ -109,10 +109,15 @@ class CloudNASApp:
 
     def scan_mount_files(self, path):
         file_map = {}
+        dir_set = set()
         if not os.path.exists(path):
-            return file_map
+            return file_map, dir_set
         try:
             for root, dirs, files in os.walk(path):
+                rel_root = os.path.relpath(root, path)
+                if rel_root != ".":
+                    dir_set.add(rel_root)
+
                 for f in files:
                     if f.startswith("."):  # Ignore system hidden files like .DS_Store
                         continue
@@ -125,23 +130,41 @@ class CloudNASApp:
                         pass
         except Exception:
             pass
-        return file_map
+        return file_map, dir_set
 
     def fs_watcher_loop(self):
-        """Monitors local mount drive for live file additions, modifications, and deletions."""
+        """Monitors local mount drive for live file & folder additions, modifications, and deletions."""
         mount_path = self.get_mount_path()
-        last_files = self.scan_mount_files(mount_path)
+        last_files, last_dirs = self.scan_mount_files(mount_path)
 
         while self.is_monitoring:
             time.sleep(1.5)
             current_path = self.get_mount_path()
             if not os.path.exists(current_path):
-                last_files = {}
+                last_files, last_dirs = {}, set()
                 continue
 
-            current_files = self.scan_mount_files(current_path)
+            current_files, current_dirs = self.scan_mount_files(current_path)
 
-            if last_files:
+            if last_files or last_dirs:
+                # Detect added folders and auto-sync them to GCS server
+                for rel_dir in current_dirs:
+                    if rel_dir not in last_dirs:
+                        full_dir_path = os.path.join(current_path, rel_dir)
+                        keep_file = os.path.join(full_dir_path, ".keep")
+                        if not os.path.exists(keep_file):
+                            try:
+                                with open(keep_file, "w") as kf:
+                                    kf.write("")
+                            except Exception:
+                                pass
+                        self.root.after(0, self.log, f"📁 Folder Created & Synced to Cloud: {rel_dir}")
+
+                # Detect deleted folders
+                for rel_dir in last_dirs:
+                    if rel_dir not in current_dirs:
+                        self.root.after(0, self.log, f"🗑️ Folder Deleted: {rel_dir}")
+
                 # Detect added files
                 for rel_p in current_files:
                     if rel_p not in last_files:
@@ -159,6 +182,7 @@ class CloudNASApp:
                         self.root.after(0, self.log, f"🗑️ File Deleted: {rel_p}")
 
             last_files = current_files
+            last_dirs = current_dirs
 
     def create_header(self):
         header_frame = tk.Frame(self.root, bg="#181825", padx=15, pady=10)
