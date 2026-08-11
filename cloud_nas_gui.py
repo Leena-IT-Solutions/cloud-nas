@@ -1,4 +1,3 @@
-#!/usr/bin/env bash
 #!/usr/bin/env python3
 """
 Cloud NAS Desktop Control Center & Live Monitor
