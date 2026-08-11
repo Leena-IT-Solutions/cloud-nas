@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# macOS 1-Click Zero-Dependency Driverless Cloud NAS Installer
+# macOS 1-Click Zero-Dependency Cloud NAS Installer
 
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 KEY_FILE="$SCRIPT_DIR/leena-it-solutions-412315-f63f3bd287c1.json"
@@ -76,31 +76,29 @@ echo "[INFO] Mounting Cloud NAS ($VOL_NAME) to $MOUNT_POINT..."
 pkill -9 -f "rclone serve webdav" >/dev/null 2>&1
 pkill -9 -f "rclone mount" >/dev/null 2>&1
 if [ -d "$MOUNT_POINT" ]; then
-    umount -f "$MOUNT_POINT" >/dev/null 2>&1
     diskutil unmount force "$MOUNT_POINT" >/dev/null 2>&1
+    umount -f "$MOUNT_POINT" >/dev/null 2>&1
 fi
 mkdir -p "$MOUNT_POINT"
 
-# Launch rclone WebDAV server on 127.0.0.1:8080
-nohup "$RCLONE_BIN" serve webdav "$REMOTE_PATH" \
-    --addr 127.0.0.1:8080 \
+# Launch rclone mount in background via nohup
+nohup "$RCLONE_BIN" mount "$REMOTE_PATH" "$MOUNT_POINT" \
     --vfs-cache-mode full \
     --vfs-cache-max-size 10G \
     --vfs-cache-max-age 24h \
     --vfs-write-back 1s \
     --dir-cache-time 10s \
     --attr-timeout 1s \
+    --allow-non-empty \
     --gcs-bucket-policy-only \
+    --volname "$VOL_NAME" \
     --rc \
     --rc-no-auth \
     --rc-addr 127.0.0.1:5572 \
     --no-modtime \
     $READ_ONLY_FLAG >/dev/null 2>&1 &
 
-sleep 2
-
-# Mount natively in macOS Finder via OS built-in mount_webdav (ZERO macFUSE required!)
-mount_webdav http://127.0.0.1:8080 "$MOUNT_POINT" >/dev/null 2>&1
+sleep 1
 
 # Create macOS Application Bundle in ~/Applications/Cloud NAS.app for Launchpad & Spotlight
 APP_DIR="$HOME/Applications/Cloud NAS.app"
