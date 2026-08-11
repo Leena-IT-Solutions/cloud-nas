@@ -20,7 +20,7 @@ if not exist "%KEY_FILE%" (
 )
 echo [OK] Found GCP Key: %KEY_FILE%
 
-rem 2. Check / Download Rclone
+rem 2. Check / Download Rclone Binary
 if not exist "%RCLONE_BIN%" (
     echo [INFO] Downloading official Rclone binary for Windows...
     powershell -Command "Invoke-WebRequest -Uri 'https://downloads.rclone.org/v1.70.0/rclone-v1.70.0-windows-amd64.zip' -OutFile '%TEMP%\rclone.zip'"
@@ -31,11 +31,16 @@ if not exist "%RCLONE_BIN%" (
 )
 echo [OK] Rclone Binary Ready: %RCLONE_BIN%
 
-rem 3. Mount Native WebDAV Drive (Zero WinFsp required!)
+rem 3. Start Windows Native WebClient Service (Zero External Drivers Required!)
+echo [INFO] Enabling Windows Native WebClient Service...
+sc config WebClient start= auto >nul 2>&1
+net start WebClient >nul 2>&1
+
+rem 4. Mount Native WebDAV Drive (Z:)
 echo [INFO] Mounting Cloud NAS Network Drive (Z:)...
 cscript //nologo "%MOUNT_VBS%"
 
-rem 4. Add Windows Startup Shortcut for GUI
+rem 5. Add Windows Startup Shortcut for GUI
 set "STARTUP_FOLDER=%APPDATA%\Microsoft\Windows\Start Menu\Programs\Startup"
 set "SHORTCUT_VBS=%TEMP%\create_shortcut.vbs"
 echo Set oWS = WScript.CreateObject("WScript.Shell") > "%SHORTCUT_VBS%"
