@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 Cloud NAS Automated 1-Click Installer & Configurator
-Supports macOS & Windows out of the box.
+Supports macOS & Windows out of the box with Persistent Boot Auto-Mounting.
 """
 
 import os
@@ -104,6 +104,51 @@ def configure_rclone(rclone_bin, key_file, bucket_name):
         log("Failed to configure Rclone remote", "ERR")
     return ok
 
+def setup_autostart_mac(mount_script_path):
+    """Ensure Cloud NAS drive auto-mounts on macOS reboot via LaunchAgent."""
+    plist_dir = Path.home() / "Library" / "LaunchAgents"
+    plist_dir.mkdir(parents=True, exist_ok=True)
+    plist_path = plist_dir / "com.cloudnas.automount.plist"
+    
+    plist_content = f'''<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.cloudnas.automount</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>/bin/bash</string>
+        <string>{mount_script_path}</string>
+    </array>
+    <key>RunAtLoad</key>
+    <true/>
+    <key>KeepAlive</key>
+    <false/>
+</dict>
+</plist>
+'''
+    try:
+        with open(plist_path, "w") as f:
+            f.write(plist_content)
+        run_cmd(f'launchctl load -w "{plist_path}"', check=False)
+        log(f"Configured persistent macOS boot auto-mount LaunchAgent at {plist_path}", "OK")
+    except Exception as e:
+        log(f"Failed to set up macOS autostart: {e}", "ERR")
+
+def setup_autostart_windows(vbs_file):
+    """Ensure Cloud NAS drive auto-mounts on Windows reboot via Startup folder."""
+    try:
+        appdata = os.environ.get("APPDATA")
+        if appdata:
+            startup_dir = Path(appdata) / "Microsoft" / "Windows" / "Start Menu" / "Programs" / "Startup"
+            startup_dir.mkdir(parents=True, exist_ok=True)
+            target_vbs = startup_dir / "CloudNAS_AutoMount.vbs"
+            shutil.copy(vbs_file, target_vbs)
+            log(f"Configured persistent Windows boot auto-mount shortcut at {target_vbs}", "OK")
+    except Exception as e:
+        log(f"Failed to set up Windows autostart: {e}", "ERR")
+
 def mount_drive_mac(rclone_bin, bucket_name):
     """Mount GCS drive on macOS Finder."""
     log("Setting up Cloud NAS on macOS Finder...")
@@ -114,15 +159,23 @@ def mount_drive_mac(rclone_bin, bucket_name):
     run_cmd(f'diskutil unmount force "{mount_point}"', check=False)
     run_cmd(f'umount -f "{mount_point}"', check=False)
 
-    mount_cmd = (
-        f'"{rclone_bin}" mount {DEFAULT_REMOTE}:{bucket_name} "{mount_point}" '
-        f'--vfs-cache-mode full --vfs-cache-max-size 10G --vfs-cache-max-age 24h '
-        f'--vfs-write-back 1s --allow-non-empty --gcs-bucket-policy-only '
-        f'--volname "Cloud NAS" --no-modtime --daemon'
-    )
-    ok, out = run_cmd(mount_cmd)
+    mac_script = SCRIPT_DIR / "mac-mount.sh"
+    script_content = f'''#!/bin/bash
+diskutil unmount force "{mount_point}" >/dev/null 2>&1
+umount -f "{mount_point}" >/dev/null 2>&1
+"{rclone_bin}" mount {DEFAULT_REMOTE}:{bucket_name} "{mount_point}" \\
+  --vfs-cache-mode full --vfs-cache-max-size 10G --vfs-cache-max-age 24h \\
+  --vfs-write-back 1s --allow-non-empty --gcs-bucket-policy-only \\
+  --volname "Cloud NAS" --no-modtime --daemon
+'''
+    with open(mac_script, "w") as f:
+        f.write(script_content)
+    os.chmod(mac_script, 0o755)
+
+    ok, out = run_cmd(f'"{mac_script}"')
     if ok:
         log(f"Cloud NAS successfully mounted at {mount_point} in Finder!", "OK")
+        setup_autostart_mac(mac_script)
     else:
         log("Mount command executed with warnings. Check Finder -> Locations -> CloudNAS.", "INFO")
 
@@ -142,6 +195,7 @@ WshShell.Run rcloneCmd, 0, False
     # Execute VBS launcher
     ok, out = run_cmd(f'cscript //nologo "{vbs_file}"', check=False)
     log("Cloud NAS background mount triggered! Check This PC -> Local Disk (Y:)", "OK")
+    setup_autostart_windows(vbs_file)
 
 def main():
     print("=" * 60)
@@ -173,7 +227,7 @@ def main():
         sys.exit(1)
 
     print("\n" + "=" * 60)
-    log("Automated setup completed flawlessly!", "OK")
+    log("Automated setup & boot autostart configured flawlessly!", "OK")
     print("=" * 60)
 
 if __name__ == "__main__":

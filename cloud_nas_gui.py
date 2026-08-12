@@ -82,6 +82,53 @@ def get_mount_script():
         return os.path.join(SCRIPT_DIR, "windows-mount-hidden.vbs")
     return ""
 
+def setup_autostart_mac(mount_script_path):
+    """Ensure Cloud NAS drive auto-mounts on macOS reboot via LaunchAgent."""
+    if not os.path.exists(mount_script_path):
+        return
+    plist_dir = os.path.join(os.path.expanduser("~"), "Library", "LaunchAgents")
+    os.makedirs(plist_dir, exist_ok=True)
+    plist_path = os.path.join(plist_dir, "com.cloudnas.automount.plist")
+    
+    plist_content = f'''<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.cloudnas.automount</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>/bin/bash</string>
+        <string>{mount_script_path}</string>
+    </array>
+    <key>RunAtLoad</key>
+    <true/>
+    <key>KeepAlive</key>
+    <false/>
+</dict>
+</plist>
+'''
+    try:
+        with open(plist_path, "w") as f:
+            f.write(plist_content)
+        subprocess.run(["launchctl", "load", "-w", plist_path], capture_output=True)
+    except Exception as e:
+        print(f"Failed to set up macOS autostart: {e}")
+
+def setup_autostart_windows(vbs_file):
+    """Ensure Cloud NAS drive auto-mounts on Windows reboot via Startup folder."""
+    try:
+        appdata = os.environ.get("APPDATA")
+        if appdata and os.path.exists(vbs_file):
+            startup_dir = os.path.join(appdata, "Microsoft", "Windows", "Start Menu", "Programs", "Startup")
+            os.makedirs(startup_dir, exist_ok=True)
+            target_vbs = os.path.join(startup_dir, "CloudNAS_AutoMount.vbs")
+            import shutil
+            shutil.copy(vbs_file, target_vbs)
+    except Exception as e:
+        print(f"Failed to set up Windows autostart: {e}")
+
+
 def get_chat_cache_dir():
     import tempfile
     cache_dir = os.path.join(tempfile.gettempdir(), "rclone_chat_cache")
@@ -351,8 +398,10 @@ class CloudNASApp:
             mount_script = get_mount_script()
             if IS_MAC:
                 subprocess.run(["bash", mount_script], capture_output=True)
+                setup_autostart_mac(mount_script)
             elif IS_WIN:
                 subprocess.run(["cscript", "//nologo", mount_script], capture_output=True)
+                setup_autostart_windows(mount_script)
             
             if hasattr(self, "log_box"):
                 self.log(f"🔐 Logged in as '{uname}'. Folder scope: '{folder}' ({perm}). Drive remounted!")
