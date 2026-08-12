@@ -157,7 +157,20 @@ class CloudNASApp:
         # Load / Initialize Users Database
         self.load_users_data()
 
-        # Render Initial Login View
+        # Restore saved user session if active_user_mount.json exists
+        active_user_file = os.path.join(SCRIPT_DIR, "active_user_mount.json")
+        if os.path.exists(active_user_file):
+            try:
+                with open(active_user_file, "r") as f:
+                    saved_user = json.load(f)
+                    if saved_user and "username" in saved_user:
+                        self.logged_in_user = saved_user
+                        self.show_main_app()
+                        return
+            except Exception as e:
+                print(f"Could not load saved user session: {e}")
+
+        # Fallback to Login View if no active saved session
         self.show_login_screen()
 
     def load_users_data(self):
