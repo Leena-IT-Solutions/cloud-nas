@@ -1,7 +1,10 @@
+import 'dart:io';
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:file_picker/file_picker.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:open_filex/open_filex.dart';
 import '../models/file_item.dart';
 import '../services/auth_service.dart';
 import '../services/gcs_service.dart';
@@ -79,6 +82,116 @@ class _ExplorerViewState extends State<ExplorerView> {
       _currentPath = parts.isEmpty ? "" : "${parts.join('/')}/";
     });
     _refreshFiles();
+  }
+
+  void _openFile(FileItem item) async {
+    if (item.isDirectory) {
+      _openFolder(item);
+      return;
+    }
+
+    final ext = item.name.split('.').last.toLowerCase();
+
+    // In-App Image Viewer
+    if (['jpg', 'jpeg', 'png', 'gif', 'webp'].contains(ext)) {
+      _showImagePreview(item);
+      return;
+    }
+
+    // Native Application Opener (MS Word for .docx, Acrobat/PDF Reader for .pdf, Excel for .xlsx, Media Player for .mp4)
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text("Downloading '${item.name}' to open...")),
+    );
+
+    final bytes = await _gcs.downloadBytes(item.path);
+    if (bytes == null) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("Failed to download file.")),
+        );
+      }
+      return;
+    }
+
+    try {
+      final tempDir = await getTemporaryDirectory();
+      final tempFile = File('${tempDir.path}/${item.name}');
+      await tempFile.writeAsBytes(bytes);
+
+      final result = await OpenFilex.open(tempFile.path);
+
+      if (result.type != ResultType.done && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("Opening file: ${result.message}")),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("Error opening file: $e")),
+        );
+      }
+    }
+  }
+
+  void _showImagePreview(FileItem item) {
+    showDialog(
+      context: context,
+      builder: (ctx) => Dialog(
+        backgroundColor: const Color(0xFF1E1E2E),
+        insetPadding: const EdgeInsets.all(12),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        child: FutureBuilder<Uint8List?>(
+          future: _gcs.downloadBytes(item.path),
+          builder: (ctx, snapshot) {
+            if (snapshot.connectionState == ConnectionState.waiting) {
+              return Container(
+                height: 250,
+                alignment: Alignment.center,
+                child: const Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    CircularProgressIndicator(color: Color(0xFF89B4FA)),
+                    SizedBox(height: 12),
+                    Text("Loading Image...", style: TextStyle(color: Color(0xFFA6ADC8))),
+                  ],
+                ),
+              );
+            }
+            if (snapshot.hasData && snapshot.data != null) {
+              return Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  AppBar(
+                    backgroundColor: const Color(0xFF181825),
+                    elevation: 0,
+                    title: Text(item.name, style: GoogleFonts.outfit(fontSize: 16, color: const Color(0xFFCDD6F4))),
+                    leading: IconButton(
+                      icon: const Icon(Icons.close_rounded, color: Color(0xFFCDD6F4)),
+                      onPressed: () => Navigator.pop(ctx),
+                    ),
+                  ),
+                  Container(
+                    constraints: const BoxConstraints(maxHeight: 450),
+                    padding: const EdgeInsets.all(12),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(12),
+                      child: InteractiveViewer(
+                        child: Image.memory(snapshot.data!, fit: BoxFit.contain),
+                      ),
+                    ),
+                  ),
+                ],
+              );
+            }
+            return Container(
+              padding: const EdgeInsets.all(24),
+              child: Text("Could not load image preview", style: GoogleFonts.inter(color: Colors.white)),
+            );
+          },
+        ),
+      ),
+    );
   }
 
   void _uploadFile() async {
@@ -194,8 +307,12 @@ class _ExplorerViewState extends State<ExplorerView> {
             ),
             const SizedBox(height: 24),
             ListTile(
-              leading: const Icon(Icons.info_outline_rounded, color: Color(0xFF89B4FA)),
-              title: Text("Path: /${item.path}", style: GoogleFonts.inter(color: const Color(0xFFCDD6F4), fontSize: 13)),
+              leading: const Icon(Icons.open_in_new_rounded, color: Color(0xFF89B4FA)),
+              title: Text("Open File in Application", style: GoogleFonts.inter(color: const Color(0xFF89B4FA), fontWeight: FontWeight.bold, fontSize: 14)),
+              onTap: () {
+                Navigator.pop(ctx);
+                _openFile(item);
+              },
             ),
             if (!_auth.currentUser!.isReadOnly)
               ListTile(
@@ -218,6 +335,9 @@ class _ExplorerViewState extends State<ExplorerView> {
     if (['mp4', 'mov', 'mkv', 'avi'].contains(ext)) return Icons.video_library_rounded;
     if (['mp3', 'wav', 'aac', 'flac'].contains(ext)) return Icons.audio_file_rounded;
     if (['pdf'].contains(ext)) return Icons.picture_as_pdf_rounded;
+    if (['doc', 'docx'].contains(ext)) return Icons.description_rounded;
+    if (['xls', 'xlsx'].contains(ext)) return Icons.table_chart_rounded;
+    if (['ppt', 'pptx'].contains(ext)) return Icons.slideshow_rounded;
     if (['zip', 'rar', 'tar', 'gz', '7z'].contains(ext)) return Icons.folder_zip_rounded;
     if (['txt', 'md', 'json', 'xml', 'html', 'py', 'dart'].contains(ext)) return Icons.code_rounded;
     return Icons.insert_drive_file_rounded;
@@ -329,7 +449,8 @@ class _ExplorerViewState extends State<ExplorerView> {
                               itemBuilder: (ctx, i) {
                                 final item = _filteredFiles[i];
                                 return InkWell(
-                                  onTap: () => item.isDirectory ? _openFolder(item) : _showFileDetails(item),
+                                  onTap: () => _openFile(item),
+                                  onLongPress: () => _showFileDetails(item),
                                   child: Container(
                                     padding: const EdgeInsets.all(12),
                                     decoration: BoxDecoration(
@@ -371,7 +492,8 @@ class _ExplorerViewState extends State<ExplorerView> {
                               itemBuilder: (ctx, i) {
                                 final item = _filteredFiles[i];
                                 return ListTile(
-                                  onTap: () => item.isDirectory ? _openFolder(item) : _showFileDetails(item),
+                                  onTap: () => _openFile(item),
+                                  onLongPress: () => _showFileDetails(item),
                                   leading: CircleAvatar(
                                     backgroundColor: item.isDirectory
                                         ? const Color(0xFFF9E2AF).withValues(alpha: 0.15)
