@@ -820,23 +820,30 @@ class CloudNASApp:
     def send_desktop_notification(self, title, message):
         """Triggers native desktop popups on macOS & Windows."""
         try:
+            clean_title = title.replace('"', '\\"')
+            clean_msg = message.replace('"', '\\"')
+            
             if IS_MAC:
-                clean_title = title.replace('"', '\\"')
-                clean_msg = message.replace('"', '\\"')
-                cmd = f'display notification "{clean_msg}" with title "{clean_title}"'
+                cmd = f'display notification "{clean_msg}" with title "{clean_title}" sound name "default"'
                 subprocess.run(["osascript", "-e", cmd], capture_output=True)
             elif IS_WIN:
-                ps_cmd = f'[reflection.assembly]::loadwithpartialname("System.Windows.Forms"); [System.Windows.Forms.MessageBox]::Show("{message}", "{title}")'
+                ps_cmd = (
+                    f'[void] [System.Reflection.Assembly]::LoadWithPartialName("System.Windows.Forms"); '
+                    f'$n = New-Object System.Windows.Forms.NotifyIcon; '
+                    f'$n.Icon = [System.Drawing.SystemIcons]::Information; '
+                    f'$n.Visible = $true; '
+                    f'$n.ShowBalloonTip(5000, "{clean_title}", "{clean_msg}", [System.Windows.Forms.ToolTipIcon]::Info);'
+                )
                 subprocess.run(["powershell", "-Command", ps_cmd], capture_output=True)
         except Exception:
             pass
 
     def chat_poller_loop(self):
-        """Polls GCS chat store every 5 seconds for live incoming messages."""
+        """Polls GCS chat store every 2.5 seconds for live incoming messages."""
         last_seen_count = {}
         
         while self.is_monitoring:
-            time.sleep(5.0)
+            time.sleep(2.5)
             if not self.logged_in_user:
                 continue
 
