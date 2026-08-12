@@ -19,11 +19,27 @@ class GCSService {
   bool isConnected = false;
 
   Future<bool> restoreSavedSettings() async {
-    final bucket = await _storage.getGcsBucketName();
-    final customKey = await _storage.getGcsCustomKeyJson();
-    if (bucket != null && bucket.isNotEmpty && customKey != null) {
-      bucketName = bucket;
-      customKeyJson = customKey;
+    final activeDisk = await _storage.getActiveDiskName();
+    if (activeDisk != null && activeDisk.isNotEmpty) {
+      final profile = await _storage.getDiskProfile(activeDisk);
+      if (profile != null && profile['key'] != null) {
+        bucketName = activeDisk;
+        customKeyJson = profile['key'];
+        return await testConnection();
+      }
+    }
+    return false;
+  }
+
+  Future<bool> switchDisk(String targetBucketName) async {
+    final profile = await _storage.getDiskProfile(targetBucketName);
+    if (profile != null && profile['key'] != null) {
+      bucketName = targetBucketName;
+      customKeyJson = profile['key'];
+      _accessToken = null;
+      _tokenExpiry = null;
+      isConnected = false;
+      await _storage.setActiveDiskName(targetBucketName);
       return await testConnection();
     }
     return false;
@@ -38,7 +54,7 @@ class GCSService {
     _tokenExpiry = null;
     isConnected = false;
     if (bucketName.isNotEmpty && customKeyJson != null) {
-      _storage.saveGcsSettings(bucketName: bucketName, keyJson: customKeyJson);
+      _storage.saveDiskProfile(bucketName: bucketName, keyJson: customKeyJson!);
     }
   }
 

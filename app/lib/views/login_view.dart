@@ -43,9 +43,9 @@ class _LoginViewState extends State<LoginView> {
   }
 
   void _loadSavedSettings() async {
-    final savedBucket = await _storage.getGcsBucketName();
+    final activeDisk = await _storage.getActiveDiskName();
     final savedKey = await _storage.getGcsCustomKeyJson();
-    final disks = await _storage.getGcsBucketList();
+    final diskNames = await _storage.getSavedDiskNames();
     final savedCreds = await _storage.getUserCredentials();
 
     if (savedCreds != null) {
@@ -53,19 +53,19 @@ class _LoginViewState extends State<LoginView> {
       _passController.text = savedCreds['password'] ?? '';
     }
 
-    if (savedBucket != null && savedBucket.isNotEmpty) {
-      _bucketController.text = savedBucket;
+    if (activeDisk != null && activeDisk.isNotEmpty) {
+      _bucketController.text = activeDisk;
     }
 
     setState(() {
-      _savedDisks = disks;
+      _savedDisks = diskNames;
       if (savedKey != null) {
         _customKeyJson = savedKey;
         _gcsFileName = "Stored Key (${savedKey['client_email'] ?? 'Service Account'})";
       }
     });
 
-    if (savedBucket != null && savedBucket.isNotEmpty && savedKey != null) {
+    if (activeDisk != null && activeDisk.isNotEmpty && savedKey != null) {
       _testGcsConnection(silent: true);
     }
   }
@@ -117,7 +117,7 @@ class _LoginViewState extends State<LoginView> {
       if (parsed['type'] == 'service_account' || parsed['private_key'] != null) {
         setState(() {
           _customKeyJson = parsed;
-          _gcsFileName = "Pasted JSON Key (${parsed['client_email'] ?? 'Service Account'})";
+          _gcsFileName = "Pasted Key (${parsed['client_email'] ?? 'Service Account'})";
           _showJsonTextInput = false;
           _errorMessage = null;
         });
@@ -174,7 +174,7 @@ class _LoginViewState extends State<LoginView> {
       });
 
       if (success) {
-        final updatedDisks = await _storage.getGcsBucketList();
+        final updatedDisks = await _storage.getSavedDiskNames();
         setState(() {
           _savedDisks = updatedDisks;
         });
@@ -317,7 +317,6 @@ class _LoginViewState extends State<LoginView> {
                           ),
                           const SizedBox(height: 14),
 
-                          // Saved Storage Disks Dropdown
                           if (_savedDisks.isNotEmpty) ...[
                             DropdownButtonFormField<String>(
                               initialValue: _savedDisks.contains(_bucketController.text) ? _bucketController.text : null,
@@ -327,11 +326,16 @@ class _LoginViewState extends State<LoginView> {
                               items: _savedDisks.map((disk) {
                                 return DropdownMenuItem(value: disk, child: Text("💾 $disk"));
                               }).toList(),
-                              onChanged: (val) {
+                              onChanged: (val) async {
                                 if (val != null) {
-                                  setState(() {
-                                    _bucketController.text = val;
-                                  });
+                                  _bucketController.text = val;
+                                  final profile = await _storage.getDiskProfile(val);
+                                  if (profile != null && profile['key'] != null) {
+                                    setState(() {
+                                      _customKeyJson = profile['key'];
+                                      _gcsFileName = "Stored Key (${profile['key']['client_email'] ?? 'Service Account'})";
+                                    });
+                                  }
                                 }
                               },
                             ),
@@ -345,7 +349,6 @@ class _LoginViewState extends State<LoginView> {
                           ),
                           const SizedBox(height: 12),
 
-                          // Key Selection Status & Buttons
                           Text(
                             "GCP SERVICE ACCOUNT KEY",
                             style: GoogleFonts.inter(fontSize: 10, fontWeight: FontWeight.bold, color: const Color(0xFFA6ADC8), letterSpacing: 1),
@@ -553,7 +556,7 @@ class _LoginViewState extends State<LoginView> {
                                 child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFF11111B)),
                               )
                             : Text(
-                                "LOGIN & REMEMBER CREDENTIALS",
+                                "LOGIN TO CLOUD NAS",
                                 style: GoogleFonts.inter(
                                   fontWeight: FontWeight.bold,
                                   fontSize: 12,
