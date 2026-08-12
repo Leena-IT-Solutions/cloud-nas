@@ -20,6 +20,7 @@ class _ExplorerViewState extends State<ExplorerView> {
   final _auth = AuthService();
   final _gcs = GCSService();
 
+  String _activeBucketName = "";
   String _currentPath = "";
   List<FileItem> _files = [];
   List<FileItem> _filteredFiles = [];
@@ -30,16 +31,35 @@ class _ExplorerViewState extends State<ExplorerView> {
   @override
   void initState() {
     super.initState();
+    _activeBucketName = _gcs.bucketName;
+    _resetPathAndLoad();
+  }
+
+  void _resetPathAndLoad() {
     final user = _auth.currentUser;
     if (user != null && !user.isAdmin) {
       String p = user.folderPath;
       if (p.startsWith('/')) p = p.substring(1);
       _currentPath = p;
+    } else {
+      _currentPath = "";
     }
     _refreshFiles();
   }
 
+  void _checkBucketChanged() {
+    if (_gcs.bucketName != _activeBucketName) {
+      _activeBucketName = _gcs.bucketName;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          _resetPathAndLoad();
+        }
+      });
+    }
+  }
+
   Future<void> _refreshFiles() async {
+    if (!mounted) return;
     setState(() => _isLoading = true);
     final list = await _gcs.listFiles(_currentPath);
     if (mounted) {
@@ -345,6 +365,7 @@ class _ExplorerViewState extends State<ExplorerView> {
 
   @override
   Widget build(BuildContext context) {
+    _checkBucketChanged();
     final user = _auth.currentUser;
 
     return Scaffold(
