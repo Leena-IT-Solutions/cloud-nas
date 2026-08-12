@@ -3,7 +3,7 @@ chcp 65001 >nul
 setlocal enabledelayedexpansion
 
 echo ============================================================
-echo      🚀 Windows 1-Click Zero-Dependency Cloud NAS Installer 🚀
+echo      🚀 Windows 1-Click Cloud NAS Dual-Engine Installer 🚀
 echo ============================================================
 
 set "SCRIPT_DIR=%~dp0"
@@ -48,17 +48,27 @@ if not exist "%RCLONE_BIN%" (
 )
 echo [OK] Rclone Binary Ready: %RCLONE_BIN%
 
-rem 3. Start Windows Native WebClient Service & Configure Registry
-echo [INFO] Enabling Windows Native WebClient Service...
+rem 3. Check / Install WinFsp Driver for Native High-Speed Disk Drive Mounting
+sc query winfsp >nul 2>&1
+if errorlevel 1 (
+    echo [INFO] Installing WinFsp Native Drive Driver for Windows...
+    powershell -Command "$ProgressPreference = 'SilentlyContinue'; Invoke-WebRequest -Uri 'https://github.com/winfsp/winfsp/releases/download/v2.0/winfsp-2.0.23075.msi' -OutFile '%TEMP%\winfsp.msi'"
+    msiexec /i "%TEMP%\winfsp.msi" /qn /norestart >nul 2>&1
+    del /F /Q "%TEMP%\winfsp.msi" >nul 2>&1
+)
+echo [OK] WinFsp Native Drive Driver Ready!
+
+rem 4. Start Windows WebClient Service & Configure Registry (WebDAV Fallback)
+echo [INFO] Enabling Windows WebClient Service & Registry Settings...
 reg add HKLM\SYSTEM\CurrentControlSet\Services\WebClient\Parameters /v BasicAuthLevel /t REG_DWORD /d 2 /f >nul 2>&1
 sc config WebClient start= auto >nul 2>&1
 net start WebClient >nul 2>&1
 
-rem 4. Mount Native WebDAV Drive (Z:)
+rem 5. Mount Cloud NAS Network Drive (Z:)
 echo [INFO] Mounting Cloud NAS Network Drive (Z:)...
 cscript //nologo "%MOUNT_VBS%"
 
-rem 5. Add Windows Startup Shortcut for GUI
+rem 6. Add Windows Startup Shortcut for GUI
 set "STARTUP_FOLDER=%APPDATA%\Microsoft\Windows\Start Menu\Programs\Startup"
 set "SHORTCUT_VBS=%TEMP%\create_shortcut.vbs"
 echo Set oWS = WScript.CreateObject("WScript.Shell") > "%SHORTCUT_VBS%"
