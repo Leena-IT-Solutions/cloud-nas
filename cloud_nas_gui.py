@@ -718,7 +718,40 @@ class CloudNASApp:
             toolbar_frame, text="⬇️ Pull (Sync GCS -> Local)", command=self.action_pull,
             bg="#cba6f7", fg="#11111b", hover_bg="#f5c2e7"
         )
-        btn_pull.pack(side="left")
+        btn_pull.pack(side="left", padx=(0, 8))
+
+        btn_webdav = DarkButton(
+            toolbar_frame, text="📱 Android / WebDAV Server", command=self.action_webdav_server,
+            bg="#fab387", fg="#11111b", hover_bg="#f9e2af"
+        )
+        btn_webdav.pack(side="left")
+
+    def action_webdav_server(self):
+        """Starts or toggles WebDAV server for Android & local mobile clients."""
+        if hasattr(self, "webdav_proc") and self.webdav_proc and self.webdav_proc.poll() is None:
+            messagebox.showinfo("📱 Android WebDAV Server", "WebDAV Server is already running on port 8080!\n\nAndroid Connection Info:\n• Host: http://<your-ip-address>\n• Port: 8080\n• User: admin\n• Password: password")
+            return
+
+        def _start_webdav():
+            rclone_bin = get_rclone_bin()
+            try:
+                self.webdav_proc = subprocess.Popen([rclone_bin, "serve", "webdav", "gcsnas:sv-school", "--addr", ":8080"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                self.log("🌐 Started Android WebDAV Server on port 8080 (http://0.0.0.0:8080)")
+            except Exception as e:
+                self.log(f"❌ Failed to start WebDAV Server: {e}")
+
+        threading.Thread(target=_start_webdav, daemon=True).start()
+        messagebox.showinfo(
+            "📱 Android WebDAV Server Started!",
+            "✅ WebDAV Server is now running on port 8080!\n\n"
+            "Connect from Android (Solid Explorer / CX File Explorer):\n"
+            "1. Add New Storage -> Select WebDAV\n"
+            "2. Host: http://<your-ip-address>\n"
+            "3. Port: 8080\n"
+            "4. User: admin\n"
+            "5. Password: password\n\n"
+            "Cloud NAS is now accessible on Android!"
+        )
 
     def create_log_console(self):
         console_frame = tk.Frame(self.content_frame, bg="#181825", padx=15, pady=10)
