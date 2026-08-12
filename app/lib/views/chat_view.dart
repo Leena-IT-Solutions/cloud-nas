@@ -144,34 +144,37 @@ class _ChatViewState extends State<ChatView> {
                 final u = contacts[i];
                 final isSelected = _activeContact?.username.toLowerCase() == u.username.toLowerCase();
 
-                return ListTile(
-                  selected: isSelected,
-                  selectedTileColor: const Color(0xFF313244),
-                  leading: CircleAvatar(
-                    backgroundColor: isSelected ? const Color(0xFFA6E3A1) : const Color(0xFF45475A),
-                    child: Text(
-                      u.username[0].toUpperCase(),
-                      style: GoogleFonts.inter(
-                        color: isSelected ? const Color(0xFF11111B) : const Color(0xFFCDD6F4),
-                        fontWeight: FontWeight.bold,
+                return Material(
+                  color: Colors.transparent,
+                  child: ListTile(
+                    selected: isSelected,
+                    selectedTileColor: const Color(0xFF313244),
+                    leading: CircleAvatar(
+                      backgroundColor: isSelected ? const Color(0xFFA6E3A1) : const Color(0xFF45475A),
+                      child: Text(
+                        u.username[0].toUpperCase(),
+                        style: GoogleFonts.inter(
+                          color: isSelected ? const Color(0xFF11111B) : const Color(0xFFCDD6F4),
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
                     ),
-                  ),
-                  title: Text(
-                    u.username,
-                    style: GoogleFonts.inter(
-                      color: isSelected ? const Color(0xFFA6E3A1) : const Color(0xFFCDD6F4),
-                      fontWeight: FontWeight.w600,
+                    title: Text(
+                      u.username,
+                      style: GoogleFonts.inter(
+                        color: isSelected ? const Color(0xFFA6E3A1) : const Color(0xFFCDD6F4),
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
+                    subtitle: Text(
+                      u.role,
+                      style: GoogleFonts.inter(color: const Color(0xFFA6ADC8), fontSize: 11),
+                    ),
+                    onTap: () {
+                      setState(() => _activeContact = u);
+                      _loadHistory();
+                    },
                   ),
-                  subtitle: Text(
-                    u.role,
-                    style: GoogleFonts.inter(color: const Color(0xFFA6ADC8), fontSize: 11),
-                  ),
-                  onTap: () {
-                    setState(() => _activeContact = u);
-                    _loadHistory();
-                  },
                 );
               },
             ),
