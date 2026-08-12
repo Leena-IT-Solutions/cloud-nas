@@ -169,7 +169,7 @@ class _LoginViewState extends State<LoginView> {
                   ),
                   const SizedBox(height: 14),
                   Text(
-                    "LITS IN THE CLOUD",
+                    "CLOUD NAS",
                     style: GoogleFonts.outfit(
                       fontSize: 24,
                       fontWeight: FontWeight.bold,
@@ -178,7 +178,7 @@ class _LoginViewState extends State<LoginView> {
                     ),
                   ),
                   Text(
-                    "Cloud NAS Storage System",
+                    "Multi-User Cloud Storage",
                     style: GoogleFonts.inter(
                       fontSize: 12,
                       color: const Color(0xFFA6ADC8),

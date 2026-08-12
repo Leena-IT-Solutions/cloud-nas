@@ -104,7 +104,7 @@ class _MainShellState extends State<MainShell> {
             ),
             const SizedBox(width: 10),
             Text(
-              "LITS in the Cloud",
+              "CLOUD NAS",
               style: GoogleFonts.outfit(
                 fontSize: 17,
                 fontWeight: FontWeight.bold,
