@@ -12,39 +12,33 @@ class GCSService {
 
   final StorageService _storage = StorageService();
 
-  String bucketName = "sv-school";
+  String bucketName = "";
   Map<String, dynamic>? customKeyJson;
   String? _accessToken;
   DateTime? _tokenExpiry;
   bool isConnected = false;
 
-  Future<void> restoreSavedSettings() async {
+  Future<bool> restoreSavedSettings() async {
     final bucket = await _storage.getGcsBucketName();
     final customKey = await _storage.getGcsCustomKeyJson();
-    bucketName = bucket;
-    if (customKey != null) {
+    if (bucket != null && bucket.isNotEmpty && customKey != null) {
+      bucketName = bucket;
       customKeyJson = customKey;
+      return await testConnection();
     }
+    return false;
   }
 
   void configure({required String bucket, Map<String, dynamic>? keyJson}) {
-    bucketName = bucket.trim().isEmpty ? "sv-school" : bucket.trim();
+    bucketName = bucket.trim();
     if (keyJson != null) {
       customKeyJson = keyJson;
     }
     _accessToken = null;
     _tokenExpiry = null;
     isConnected = false;
-    _storage.saveGcsSettings(bucketName: bucketName, keyJson: customKeyJson);
-  }
-
-  Future<void> _loadKey() async {
-    if (customKeyJson != null) return;
-    try {
-      final jsonString = await rootBundle.loadString('assets/gcp_key.json');
-      customKeyJson = jsonDecode(jsonString);
-    } catch (e) {
-      print("Error loading GCP key asset: $e");
+    if (bucketName.isNotEmpty && customKeyJson != null) {
+      _storage.saveGcsSettings(bucketName: bucketName, keyJson: customKeyJson);
     }
   }
 
@@ -53,7 +47,6 @@ class GCSService {
       return _accessToken;
     }
 
-    await _loadKey();
     if (customKeyJson == null) return null;
 
     final clientEmail = customKeyJson!['client_email'];
@@ -105,6 +98,7 @@ class GCSService {
   }
 
   Future<bool> testConnection() async {
+    if (bucketName.isEmpty || customKeyJson == null) return false;
     final token = await getAccessToken();
     if (token == null) return false;
 

@@ -5,6 +5,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:file_picker/file_picker.dart';
 import '../services/auth_service.dart';
 import '../services/gcs_service.dart';
+import '../services/storage_service.dart';
 
 class LoginView extends StatefulWidget {
   final VoidCallback onLoginSuccess;
@@ -16,26 +17,57 @@ class LoginView extends StatefulWidget {
 }
 
 class _LoginViewState extends State<LoginView> {
-  final _bucketController = TextEditingController(text: "sv-school");
+  final _bucketController = TextEditingController();
+  final _jsonTextController = TextEditingController();
   final _userController = TextEditingController();
   final _passController = TextEditingController();
 
   final _auth = AuthService();
   final _gcs = GCSService();
+  final _storage = StorageService();
 
   bool _isGcsConnected = false;
   bool _isTestingGcs = false;
   String? _gcsFileName;
   Map<String, dynamic>? _customKeyJson;
+  List<String> _savedDisks = [];
 
   String? _errorMessage;
   bool _isLoading = false;
+  bool _showJsonTextInput = false;
 
   @override
   void initState() {
     super.initState();
-    // Auto-test default GCS connection on startup
-    _testGcsConnection(silent: true);
+    _loadSavedSettings();
+  }
+
+  void _loadSavedSettings() async {
+    final savedBucket = await _storage.getGcsBucketName();
+    final savedKey = await _storage.getGcsCustomKeyJson();
+    final disks = await _storage.getGcsBucketList();
+    final savedCreds = await _storage.getUserCredentials();
+
+    if (savedCreds != null) {
+      _userController.text = savedCreds['username'] ?? '';
+      _passController.text = savedCreds['password'] ?? '';
+    }
+
+    if (savedBucket != null && savedBucket.isNotEmpty) {
+      _bucketController.text = savedBucket;
+    }
+
+    setState(() {
+      _savedDisks = disks;
+      if (savedKey != null) {
+        _customKeyJson = savedKey;
+        _gcsFileName = "Stored Key (${savedKey['client_email'] ?? 'Service Account'})";
+      }
+    });
+
+    if (savedBucket != null && savedBucket.isNotEmpty && savedKey != null) {
+      _testGcsConnection(silent: true);
+    }
   }
 
   Future<void> _pickJsonKey() async {
@@ -59,6 +91,7 @@ class _LoginViewState extends State<LoginView> {
               _customKeyJson = parsed;
               _gcsFileName = file.name;
               _isGcsConnected = false;
+              _errorMessage = null;
             });
             _testGcsConnection();
           } else {
@@ -75,7 +108,48 @@ class _LoginViewState extends State<LoginView> {
     }
   }
 
+  void _parsePastedJson() {
+    final text = _jsonTextController.text.trim();
+    if (text.isEmpty) return;
+
+    try {
+      final parsed = jsonDecode(text);
+      if (parsed['type'] == 'service_account' || parsed['private_key'] != null) {
+        setState(() {
+          _customKeyJson = parsed;
+          _gcsFileName = "Pasted JSON Key (${parsed['client_email'] ?? 'Service Account'})";
+          _showJsonTextInput = false;
+          _errorMessage = null;
+        });
+        _testGcsConnection();
+      } else {
+        setState(() {
+          _errorMessage = "Pasted text is not a valid GCP Service Account Key.";
+        });
+      }
+    } catch (e) {
+      setState(() {
+        _errorMessage = "Invalid JSON syntax.";
+      });
+    }
+  }
+
   void _testGcsConnection({bool silent = false}) async {
+    final bucket = _bucketController.text.trim();
+    if (bucket.isEmpty) {
+      if (!silent) {
+        setState(() => _errorMessage = "Please enter a GCS Bucket / Disk Name.");
+      }
+      return;
+    }
+
+    if (_customKeyJson == null) {
+      if (!silent) {
+        setState(() => _errorMessage = "Please add or import your GCP Service Account Key JSON.");
+      }
+      return;
+    }
+
     if (!silent) {
       setState(() {
         _isTestingGcs = true;
@@ -84,7 +158,7 @@ class _LoginViewState extends State<LoginView> {
     }
 
     _gcs.configure(
-      bucket: _bucketController.text,
+      bucket: bucket,
       keyJson: _customKeyJson,
     );
 
@@ -95,11 +169,16 @@ class _LoginViewState extends State<LoginView> {
         _isGcsConnected = success;
         _isTestingGcs = false;
         if (!success && !silent) {
-          _errorMessage = "Failed to connect to GCS bucket '${_bucketController.text}'. Check bucket name and key.";
+          _errorMessage = "Failed to connect to GCS bucket '$bucket'. Check bucket name & key.";
         }
       });
+
       if (success) {
-        _auth.loadUsersDatabase();
+        final updatedDisks = await _storage.getGcsBucketList();
+        setState(() {
+          _savedDisks = updatedDisks;
+        });
+        await _auth.loadUsersDatabase();
       }
     }
   }
@@ -123,6 +202,7 @@ class _LoginViewState extends State<LoginView> {
 
     final user = await _auth.login(username, password);
     if (user != null) {
+      await _storage.saveUserCredentials(username, password);
       widget.onLoginSuccess();
     } else {
       setState(() {
@@ -141,7 +221,7 @@ class _LoginViewState extends State<LoginView> {
           child: SingleChildScrollView(
             padding: const EdgeInsets.all(20.0),
             child: Container(
-              constraints: const BoxConstraints(maxWidth: 420),
+              constraints: const BoxConstraints(maxWidth: 440),
               padding: const EdgeInsets.all(28.0),
               decoration: BoxDecoration(
                 color: const Color(0xFF1E1E2E),
@@ -162,12 +242,12 @@ class _LoginViewState extends State<LoginView> {
                     borderRadius: BorderRadius.circular(20),
                     child: Image.asset(
                       'assets/app_logo.png',
-                      width: 96,
-                      height: 96,
+                      width: 84,
+                      height: 84,
                       fit: BoxFit.cover,
                     ),
                   ),
-                  const SizedBox(height: 14),
+                  const SizedBox(height: 12),
                   Text(
                     "CLOUD NAS",
                     style: GoogleFonts.outfit(
@@ -184,7 +264,7 @@ class _LoginViewState extends State<LoginView> {
                       color: const Color(0xFFA6ADC8),
                     ),
                   ),
-                  const SizedBox(height: 24),
+                  const SizedBox(height: 20),
                   if (_errorMessage != null) ...[
                     Container(
                       padding: const EdgeInsets.all(12),
@@ -208,7 +288,7 @@ class _LoginViewState extends State<LoginView> {
                     ),
                     const SizedBox(height: 16),
                   ],
-                  // STEP 1: GCS CONNECTION SETUP CARD
+                  // STEP 1: CONFIGURE GCS BUCKET & KEY
                   if (!_isGcsConnected) ...[
                     Container(
                       padding: const EdgeInsets.all(16),
@@ -225,7 +305,7 @@ class _LoginViewState extends State<LoginView> {
                               const Icon(Icons.cloud_sync_rounded, color: Color(0xFFF9E2AF), size: 20),
                               const SizedBox(width: 8),
                               Text(
-                                "CONNECT GOOGLE CLOUD",
+                                "CONNECT STORAGE DISK",
                                 style: GoogleFonts.outfit(
                                   fontSize: 13,
                                   fontWeight: FontWeight.bold,
@@ -236,37 +316,122 @@ class _LoginViewState extends State<LoginView> {
                             ],
                           ),
                           const SizedBox(height: 14),
+
+                          // Saved Storage Disks Dropdown
+                          if (_savedDisks.isNotEmpty) ...[
+                            DropdownButtonFormField<String>(
+                              initialValue: _savedDisks.contains(_bucketController.text) ? _bucketController.text : null,
+                              dropdownColor: const Color(0xFF181825),
+                              style: GoogleFonts.inter(color: const Color(0xFFCDD6F4), fontSize: 13),
+                              decoration: _inputDecoration("Saved Disks / Buckets"),
+                              items: _savedDisks.map((disk) {
+                                return DropdownMenuItem(value: disk, child: Text("💾 $disk"));
+                              }).toList(),
+                              onChanged: (val) {
+                                if (val != null) {
+                                  setState(() {
+                                    _bucketController.text = val;
+                                  });
+                                }
+                              },
+                            ),
+                            const SizedBox(height: 10),
+                          ],
+
                           TextField(
                             controller: _bucketController,
                             style: GoogleFonts.inter(color: const Color(0xFFCDD6F4), fontSize: 13),
-                            decoration: InputDecoration(
-                              labelText: "GCS Bucket Name",
-                              labelStyle: GoogleFonts.inter(color: const Color(0xFFA6ADC8), fontSize: 12),
-                              prefixIcon: const Icon(Icons.folder_special_rounded, color: Color(0xFF89B4FA), size: 18),
-                              filled: true,
-                              fillColor: const Color(0xFF1E1E2E),
-                              contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                              border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(10),
-                                borderSide: BorderSide.none,
-                              ),
+                            decoration: _inputDecoration("GCS Bucket / Disk Name"),
+                          ),
+                          const SizedBox(height: 12),
+
+                          // Key Selection Status & Buttons
+                          Text(
+                            "GCP SERVICE ACCOUNT KEY",
+                            style: GoogleFonts.inter(fontSize: 10, fontWeight: FontWeight.bold, color: const Color(0xFFA6ADC8), letterSpacing: 1),
+                          ),
+                          const SizedBox(height: 6),
+                          Container(
+                            padding: const EdgeInsets.all(10),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF1E1E2E),
+                              borderRadius: BorderRadius.circular(10),
+                              border: Border.all(color: _customKeyJson != null ? const Color(0xFFA6E3A1) : const Color(0xFFF38BA8)),
+                            ),
+                            child: Row(
+                              children: [
+                                Icon(
+                                  _customKeyJson != null ? Icons.key_rounded : Icons.key_off_rounded,
+                                  color: _customKeyJson != null ? const Color(0xFFA6E3A1) : const Color(0xFFF38BA8),
+                                  size: 18,
+                                ),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: Text(
+                                    _gcsFileName ?? "No GCP Key Configured (Empty)",
+                                    style: GoogleFonts.inter(
+                                      color: _customKeyJson != null ? const Color(0xFFA6E3A1) : const Color(0xFFF38BA8),
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                ),
+                              ],
                             ),
                           ),
                           const SizedBox(height: 10),
-                          OutlinedButton.icon(
-                            onPressed: _pickJsonKey,
-                            icon: const Icon(Icons.key_rounded, size: 16),
-                            label: Text(
-                              _gcsFileName != null ? "Key: $_gcsFileName" : "Use Embedded GCP Key (Or Import JSON)",
-                              style: GoogleFonts.inter(fontSize: 12),
-                            ),
-                            style: OutlinedButton.styleFrom(
-                              foregroundColor: const Color(0xFF89B4FA),
-                              side: const BorderSide(color: Color(0xFF313244)),
-                              padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 12),
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                            ),
+                          Row(
+                            children: [
+                              Expanded(
+                                child: OutlinedButton.icon(
+                                  onPressed: _pickJsonKey,
+                                  icon: const Icon(Icons.file_upload_outlined, size: 16),
+                                  label: Text("Select .json", style: GoogleFonts.inter(fontSize: 11)),
+                                  style: OutlinedButton.styleFrom(
+                                    foregroundColor: const Color(0xFF89B4FA),
+                                    side: const BorderSide(color: Color(0xFF313244)),
+                                    padding: const EdgeInsets.symmetric(vertical: 10),
+                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: OutlinedButton.icon(
+                                  onPressed: () => setState(() => _showJsonTextInput = !_showJsonTextInput),
+                                  icon: const Icon(Icons.code_rounded, size: 16),
+                                  label: Text("Paste JSON", style: GoogleFonts.inter(fontSize: 11)),
+                                  style: OutlinedButton.styleFrom(
+                                    foregroundColor: const Color(0xFF89B4FA),
+                                    side: const BorderSide(color: Color(0xFF313244)),
+                                    padding: const EdgeInsets.symmetric(vertical: 10),
+                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                  ),
+                                ),
+                              ),
+                            ],
                           ),
+                          if (_showJsonTextInput) ...[
+                            const SizedBox(height: 10),
+                            TextField(
+                              controller: _jsonTextController,
+                              maxLines: 4,
+                              style: GoogleFonts.inter(color: const Color(0xFFCDD6F4), fontSize: 11),
+                              decoration: _inputDecoration("Paste Service Account JSON text here..."),
+                            ),
+                            const SizedBox(height: 6),
+                            SizedBox(
+                              width: double.infinity,
+                              child: ElevatedButton(
+                                onPressed: _parsePastedJson,
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: const Color(0xFF313244),
+                                  foregroundColor: const Color(0xFFCDD6F4),
+                                ),
+                                child: Text("Apply Pasted JSON", style: GoogleFonts.inter(fontSize: 12)),
+                              ),
+                            ),
+                          ],
                           const SizedBox(height: 14),
                           SizedBox(
                             width: double.infinity,
@@ -277,7 +442,7 @@ class _LoginViewState extends State<LoginView> {
                                   ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFF11111B)))
                                   : const Icon(Icons.power_settings_new_rounded, size: 18),
                               label: Text(
-                                _isTestingGcs ? "Connecting..." : "CONNECT TO STORAGE",
+                                _isTestingGcs ? "Connecting..." : "CONNECT & SAVE DISK",
                                 style: GoogleFonts.inter(fontWeight: FontWeight.bold, fontSize: 12, letterSpacing: 1),
                               ),
                               style: ElevatedButton.styleFrom(
@@ -291,7 +456,8 @@ class _LoginViewState extends State<LoginView> {
                       ),
                     ),
                   ],
-                  // STEP 2: LOGIN FORM ONCE GCS IS CONNECTED
+
+                  // STEP 2: LOGIN FORM ONCE DISK IS CONNECTED
                   if (_isGcsConnected) ...[
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
@@ -316,7 +482,7 @@ class _LoginViewState extends State<LoginView> {
                           InkWell(
                             onTap: () => setState(() => _isGcsConnected = false),
                             child: Text(
-                              "Change",
+                              "Change Disk",
                               style: GoogleFonts.inter(color: const Color(0xFF89B4FA), fontSize: 12, decoration: TextDecoration.underline),
                             ),
                           ),
@@ -387,10 +553,10 @@ class _LoginViewState extends State<LoginView> {
                                 child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFF11111B)),
                               )
                             : Text(
-                                "LOGIN TO CLOUD NAS",
+                                "LOGIN & REMEMBER CREDENTIALS",
                                 style: GoogleFonts.inter(
                                   fontWeight: FontWeight.bold,
-                                  fontSize: 13,
+                                  fontSize: 12,
                                   letterSpacing: 1,
                                 ),
                               ),
@@ -402,6 +568,24 @@ class _LoginViewState extends State<LoginView> {
             ),
           ),
         ),
+      ),
+    );
+  }
+
+  InputDecoration _inputDecoration(String label) {
+    return InputDecoration(
+      labelText: label,
+      labelStyle: GoogleFonts.inter(color: const Color(0xFFA6ADC8), fontSize: 12),
+      filled: true,
+      fillColor: const Color(0xFF1E1E2E),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(10),
+        borderSide: const BorderSide(color: Color(0xFF313244)),
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(10),
+        borderSide: const BorderSide(color: Color(0xFF89B4FA)),
       ),
     );
   }

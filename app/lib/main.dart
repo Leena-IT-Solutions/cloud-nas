@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'services/auth_service.dart';
 import 'services/gcs_service.dart';
+import 'services/storage_service.dart';
 import 'views/login_view.dart';
 import 'views/dashboard_view.dart';
 import 'views/explorer_view.dart';
@@ -42,6 +43,7 @@ class MainShell extends StatefulWidget {
 class _MainShellState extends State<MainShell> {
   final _auth = AuthService();
   final _gcs = GCSService();
+  final _storage = StorageService();
   int _activeTabIndex = 0;
   bool _isInitializing = true;
 
@@ -52,8 +54,17 @@ class _MainShellState extends State<MainShell> {
   }
 
   void _initSavedSession() async {
-    await _gcs.restoreSavedSettings();
-    await _auth.restoreSavedSession();
+    final gcsConnected = await _gcs.restoreSavedSettings();
+    if (gcsConnected) {
+      await _auth.loadUsersDatabase();
+      final userSession = await _auth.restoreSavedSession();
+      if (userSession == null) {
+        final creds = await _storage.getUserCredentials();
+        if (creds != null) {
+          await _auth.login(creds['username']!, creds['password']!);
+        }
+      }
+    }
     if (mounted) {
       setState(() {
         _isInitializing = false;
