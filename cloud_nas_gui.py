@@ -849,20 +849,32 @@ class CloudNASApp:
                                 text = msg.get("text", "")
                                 
                                 # Increment unread badge count if not actively reading
-                                if self.active_tab != "chat" or self.active_chat_recipient != other_u:
-                                    self.unread_counts[other_u] = self.unread_counts.get(other_u, 0) + 1
-                                    self.root.after(0, self.update_chat_tab_badge)
+                                try:
+                                    if self.active_tab != "chat" or (self.active_chat_recipient and self.active_chat_recipient.lower() != other_u.lower()):
+                                        self.unread_counts[other_u] = self.unread_counts.get(other_u, 0) + 1
+                                        self.root.after(0, self.update_chat_tab_badge)
+                                except Exception:
+                                    pass
 
                                 # Send Desktop Notification
-                                self.root.after(0, self.send_desktop_notification, f"💬 Message from {sender}", text)
+                                try:
+                                    self.root.after(0, self.send_desktop_notification, f"💬 Message from {sender}", text)
+                                except Exception:
+                                    pass
                                 
                                 # Log to console
                                 if hasattr(self, "log_box"):
-                                    self.root.after(0, self.log, f"💬 Live Chat message from {sender}: '{text}'")
+                                    try:
+                                        self.root.after(0, self.log, f"💬 Live Chat message from {sender}: '{text}'")
+                                    except Exception:
+                                        pass
 
                                 # Refresh chat window if currently open
-                                if self.active_tab == "chat" and self.active_chat_recipient == other_u:
-                                    self.root.after(0, self.load_active_chat_messages)
+                                try:
+                                    if self.active_tab == "chat" and self.active_chat_recipient and self.active_chat_recipient.lower() == other_u.lower():
+                                        self.root.after(0, self.load_active_chat_messages)
+                                except Exception:
+                                    pass
 
                     last_seen_count[chat_id] = curr_count
             except Exception as e:
@@ -995,33 +1007,42 @@ class CloudNASApp:
         self.chat_msg_box.config(state="disabled")
 
         def _async_load():
-            messages = self.fetch_chat_history(current_u, recipient)
+            try:
+                messages = self.fetch_chat_history(current_u, recipient)
+            except Exception:
+                messages = []
             
             def _update_gui():
-                if not hasattr(self, "chat_msg_box") or self.active_chat_recipient != recipient:
-                    return
-                self.chat_msg_box.config(state="normal")
-                self.chat_msg_box.delete("1.0", "end")
+                try:
+                    if not hasattr(self, "chat_msg_box") or not self.active_chat_recipient or self.active_chat_recipient.lower() != recipient.lower():
+                        return
+                    self.chat_msg_box.config(state="normal")
+                    self.chat_msg_box.delete("1.0", "end")
 
-                if not messages:
-                    self.chat_msg_box.insert("end", f"No previous messages with {recipient}. Send a message to start chatting!\n", "time")
-                else:
-                    for m in messages:
-                        sender = m.get("sender", "User")
-                        text = m.get("text", "")
-                        tstamp = m.get("timestamp", "")
+                    if not messages:
+                        self.chat_msg_box.insert("end", f"No previous messages with {recipient}. Send a message to start chatting!\n", "time")
+                    else:
+                        for m in messages:
+                            sender = m.get("sender", "User")
+                            text = m.get("text", "")
+                            tstamp = m.get("timestamp", "")
 
-                        if sender.lower() == current_u.lower():
-                            self.chat_msg_box.insert("end", f"[{tstamp}] You: ", "sent")
-                            self.chat_msg_box.insert("end", f"{text}\n")
-                        else:
-                            self.chat_msg_box.insert("end", f"[{tstamp}] {sender}: ", "received")
-                            self.chat_msg_box.insert("end", f"{text}\n")
+                            if sender.lower() == current_u.lower():
+                                self.chat_msg_box.insert("end", f"[{tstamp}] You: ", "sent")
+                                self.chat_msg_box.insert("end", f"{text}\n")
+                            else:
+                                self.chat_msg_box.insert("end", f"[{tstamp}] {sender}: ", "received")
+                                self.chat_msg_box.insert("end", f"{text}\n")
 
-                self.chat_msg_box.see("end")
-                self.chat_msg_box.config(state="disabled")
+                    self.chat_msg_box.see("end")
+                    self.chat_msg_box.config(state="disabled")
+                except Exception:
+                    pass
 
-            self.root.after(0, _update_gui)
+            try:
+                self.root.after(0, _update_gui)
+            except Exception:
+                pass
 
         threading.Thread(target=_async_load, daemon=True).start()
 
@@ -1218,15 +1239,24 @@ class CloudNASApp:
 
     def poll_stats_loop(self):
         while self.is_monitoring:
-            stats = self.api_post("core/stats")
-            if stats:
-                self.mounted = True
-                if hasattr(self, "status_badge") and self.status_badge.winfo_exists():
-                    self.root.after(0, self.update_ui_stats, stats)
-            else:
-                self.mounted = False
-                if hasattr(self, "status_badge") and self.status_badge.winfo_exists():
-                    self.root.after(0, self.update_ui_disconnected)
+            try:
+                stats = self.api_post("core/stats")
+                if stats:
+                    self.mounted = True
+                    try:
+                        if hasattr(self, "status_badge") and self.status_badge.winfo_exists():
+                            self.root.after(0, self.update_ui_stats, stats)
+                    except Exception:
+                        pass
+                else:
+                    self.mounted = False
+                    try:
+                        if hasattr(self, "status_badge") and self.status_badge.winfo_exists():
+                            self.root.after(0, self.update_ui_disconnected)
+                    except Exception:
+                        pass
+            except Exception:
+                pass
             time.sleep(1)
 
     def update_ui_stats(self, stats):
