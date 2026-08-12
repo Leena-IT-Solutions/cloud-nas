@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'services/auth_service.dart';
+import 'services/gcs_service.dart';
 import 'views/login_view.dart';
 import 'views/dashboard_view.dart';
 import 'views/explorer_view.dart';
@@ -40,10 +41,37 @@ class MainShell extends StatefulWidget {
 
 class _MainShellState extends State<MainShell> {
   final _auth = AuthService();
-  int _activeTabIndex = 0; // Default: 0 = Files Explorer
+  final _gcs = GCSService();
+  int _activeTabIndex = 0;
+  bool _isInitializing = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _initSavedSession();
+  }
+
+  void _initSavedSession() async {
+    await _gcs.restoreSavedSettings();
+    await _auth.restoreSavedSession();
+    if (mounted) {
+      setState(() {
+        _isInitializing = false;
+      });
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
+    if (_isInitializing) {
+      return const Scaffold(
+        backgroundColor: Color(0xFF181825),
+        body: Center(
+          child: CircularProgressIndicator(color: Color(0xFF89B4FA)),
+        ),
+      );
+    }
+
     if (_auth.currentUser == null) {
       return LoginView(
         onLoginSuccess: () => setState(() => _activeTabIndex = 0),
@@ -53,7 +81,7 @@ class _MainShellState extends State<MainShell> {
     final user = _auth.currentUser!;
 
     final List<Widget> tabs = [
-      const ExplorerView(),  // File Manager view as main/home tab
+      const ExplorerView(),
       const DashboardView(),
       const ChatView(),
       if (user.isAdmin) const UsersView(),
@@ -104,9 +132,9 @@ class _MainShellState extends State<MainShell> {
           PopupMenuButton<String>(
             icon: const Icon(Icons.more_vert_rounded, color: Color(0xFFCDD6F4)),
             color: const Color(0xFF1E1E2E),
-            onSelected: (val) {
+            onSelected: (val) async {
               if (val == 'logout') {
-                _auth.logout();
+                await _auth.logout();
                 setState(() => _activeTabIndex = 0);
               }
             },

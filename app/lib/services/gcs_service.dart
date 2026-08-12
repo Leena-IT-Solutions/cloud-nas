@@ -3,17 +3,29 @@ import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
 import 'package:dart_jsonwebtoken/dart_jsonwebtoken.dart';
 import '../models/file_item.dart';
+import 'storage_service.dart';
 
 class GCSService {
   static final GCSService _instance = GCSService._internal();
   factory GCSService() => _instance;
   GCSService._internal();
 
+  final StorageService _storage = StorageService();
+
   String bucketName = "sv-school";
   Map<String, dynamic>? customKeyJson;
   String? _accessToken;
   DateTime? _tokenExpiry;
   bool isConnected = false;
+
+  Future<void> restoreSavedSettings() async {
+    final bucket = await _storage.getGcsBucketName();
+    final customKey = await _storage.getGcsCustomKeyJson();
+    bucketName = bucket;
+    if (customKey != null) {
+      customKeyJson = customKey;
+    }
+  }
 
   void configure({required String bucket, Map<String, dynamic>? keyJson}) {
     bucketName = bucket.trim().isEmpty ? "sv-school" : bucket.trim();
@@ -23,6 +35,7 @@ class GCSService {
     _accessToken = null;
     _tokenExpiry = null;
     isConnected = false;
+    _storage.saveGcsSettings(bucketName: bucketName, keyJson: customKeyJson);
   }
 
   Future<void> _loadKey() async {
@@ -137,7 +150,6 @@ class GCSService {
         final data = jsonDecode(response.body);
         final List<FileItem> items = [];
 
-        // Parse Folders (prefixes)
         if (data['prefixes'] != null) {
           for (var p in data['prefixes']) {
             String folderPath = p.toString();
@@ -157,7 +169,6 @@ class GCSService {
           }
         }
 
-        // Parse Files (items)
         if (data['items'] != null) {
           for (var item in data['items']) {
             String path = item['name'] ?? '';

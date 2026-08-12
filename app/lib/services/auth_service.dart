@@ -1,6 +1,7 @@
 import 'dart:convert';
 import '../models/user_model.dart';
 import 'gcs_service.dart';
+import 'storage_service.dart';
 
 class AuthService {
   static final AuthService _instance = AuthService._internal();
@@ -8,6 +9,8 @@ class AuthService {
   AuthService._internal();
 
   final GCSService _gcs = GCSService();
+  final StorageService _storage = StorageService();
+
   UserModel? currentUser;
   List<UserModel> usersList = [];
   bool isLoading = false;
@@ -51,6 +54,15 @@ class AuthService {
     ),
   ];
 
+  Future<UserModel?> restoreSavedSession() async {
+    final savedUser = await _storage.getUserSession();
+    if (savedUser != null) {
+      currentUser = savedUser;
+      return savedUser;
+    }
+    return null;
+  }
+
   Future<void> loadUsersDatabase() async {
     isLoading = true;
     try {
@@ -81,21 +93,23 @@ class AuthService {
     return await _gcs.writeTextFile(".sys/users_permissions.json", jsonStr);
   }
 
-  UserModel? login(String username, String password) {
+  Future<UserModel?> login(String username, String password) async {
     String cleanUser = username.trim().toLowerCase();
     String cleanPass = password.trim();
 
     for (var u in usersList) {
       if (u.username.toLowerCase() == cleanUser && u.password == cleanPass) {
         currentUser = u;
+        await _storage.saveUserSession(u);
         return u;
       }
     }
     return null;
   }
 
-  void logout() {
+  Future<void> logout() async {
     currentUser = null;
+    await _storage.clearUserSession();
   }
 
   Future<bool> addUser(UserModel newUser) async {

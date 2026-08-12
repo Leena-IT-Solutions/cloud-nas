@@ -121,7 +121,7 @@ class _LoginViewState extends State<LoginView> {
       return;
     }
 
-    final user = _auth.login(username, password);
+    final user = await _auth.login(username, password);
     if (user != null) {
       widget.onLoginSuccess();
     } else {
