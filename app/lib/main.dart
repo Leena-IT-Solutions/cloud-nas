@@ -93,15 +93,23 @@ class _MainShellState extends State<MainShell> {
         elevation: 0,
         title: Row(
           children: [
-            const Icon(Icons.cloud_queue_rounded, color: Color(0xFF89B4FA), size: 24),
-            const SizedBox(width: 8),
+            ClipRRect(
+              borderRadius: BorderRadius.circular(6),
+              child: Image.asset(
+                'assets/app_logo.png',
+                width: 28,
+                height: 28,
+                fit: BoxFit.cover,
+              ),
+            ),
+            const SizedBox(width: 10),
             Text(
-              "CLOUD NAS",
+              "LITS in the Cloud",
               style: GoogleFonts.outfit(
-                fontSize: 18,
+                fontSize: 17,
                 fontWeight: FontWeight.bold,
                 color: const Color(0xFFCDD6F4),
-                letterSpacing: 1.2,
+                letterSpacing: 1.1,
               ),
             ),
           ],

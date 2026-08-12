@@ -158,23 +158,27 @@ class _LoginViewState extends State<LoginView> {
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  const Icon(
-                    Icons.cloud_queue_rounded,
-                    size: 56,
-                    color: Color(0xFF89B4FA),
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(20),
+                    child: Image.asset(
+                      'assets/app_logo.png',
+                      width: 96,
+                      height: 96,
+                      fit: BoxFit.cover,
+                    ),
                   ),
-                  const SizedBox(height: 12),
+                  const SizedBox(height: 14),
                   Text(
-                    "CLOUD NAS",
+                    "LITS IN THE CLOUD",
                     style: GoogleFonts.outfit(
-                      fontSize: 26,
+                      fontSize: 24,
                       fontWeight: FontWeight.bold,
                       color: const Color(0xFFCDD6F4),
                       letterSpacing: 1.5,
                     ),
                   ),
                   Text(
-                    "Multi-User Cloud NAS Storage",
+                    "Cloud NAS Storage System",
                     style: GoogleFonts.inter(
                       fontSize: 12,
                       color: const Color(0xFFA6ADC8),
