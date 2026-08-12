@@ -82,6 +82,15 @@ def get_mount_script():
         return os.path.join(SCRIPT_DIR, "windows-mount-hidden.vbs")
     return ""
 
+def get_chat_cache_dir():
+    import tempfile
+    cache_dir = os.path.join(tempfile.gettempdir(), "rclone_chat_cache")
+    try:
+        os.makedirs(cache_dir, exist_ok=True)
+    except Exception:
+        pass
+    return cache_dir
+
 class DarkButton(tk.Button):
     """Custom flat dark mode button with smooth hover effects for macOS & Windows."""
     def __init__(self, parent, text, command, bg, fg, hover_bg=None, font=("Segoe UI", 9, "bold"), padx=14, pady=6, **kwargs):
@@ -157,7 +166,7 @@ class CloudNASApp:
 
         # 1. Fetch live user database from Google Cloud Storage remote with isolated cache dir
         try:
-            res = subprocess.run([rclone_bin, "cat", remote_target, "--cache-dir", "/tmp/rclone_chat_cache"], capture_output=True, text=True, timeout=5)
+            res = subprocess.run([rclone_bin, "cat", remote_target, "--cache-dir", get_chat_cache_dir()], capture_output=True, text=True, timeout=5)
             if res.returncode == 0 and res.stdout.strip():
                 data = json.loads(res.stdout)
                 if "users" in data and len(data["users"]) > 0:
@@ -241,7 +250,7 @@ class CloudNASApp:
             rclone_bin = get_rclone_bin()
             remote_target = "gcsnas:sv-school/.sys/users_permissions.json"
             try:
-                subprocess.run([rclone_bin, "copyto", USERS_FILE, remote_target, "--cache-dir", "/tmp/rclone_chat_cache"], capture_output=True, timeout=10)
+                subprocess.run([rclone_bin, "copyto", USERS_FILE, remote_target, "--cache-dir", get_chat_cache_dir()], capture_output=True, timeout=10)
                 print(f"✅ User permissions database synced to GCS Cloud Storage remote: {remote_target}")
             except Exception as e:
                 print(f"Failed to sync users database to GCS: {e}")
@@ -746,7 +755,7 @@ class CloudNASApp:
         rclone_bin = get_rclone_bin()
 
         try:
-            res = subprocess.run([rclone_bin, "cat", remote_target, "--cache-dir", "/tmp/rclone_chat_cache"], capture_output=True, text=True, timeout=5)
+            res = subprocess.run([rclone_bin, "cat", remote_target, "--cache-dir", get_chat_cache_dir()], capture_output=True, text=True, timeout=5)
             if res.returncode == 0 and res.stdout.strip():
                 data = json.loads(res.stdout)
                 return data.get("messages", [])
@@ -788,7 +797,7 @@ class CloudNASApp:
                 
                 rclone_bin = get_rclone_bin()
                 
-                subprocess.run([rclone_bin, "copyto", tmp_local, remote_target, "--cache-dir", "/tmp/rclone_chat_cache"], capture_output=True, timeout=8)
+                subprocess.run([rclone_bin, "copyto", tmp_local, remote_target, "--cache-dir", get_chat_cache_dir()], capture_output=True, timeout=8)
                 if os.path.exists(tmp_local):
                     os.remove(tmp_local)
             except Exception as e:
