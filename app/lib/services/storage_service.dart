@@ -40,6 +40,32 @@ class StorageService {
     await prefs.setString(_keyActiveBucket, cleanBucket);
   }
 
+  Future<void> removeDiskProfile(String bucketName) async {
+    final prefs = await SharedPreferences.getInstance();
+    final cleanBucket = bucketName.trim();
+    final mapStr = prefs.getString(_keyDiskProfilesMap);
+
+    if (mapStr != null && mapStr.isNotEmpty) {
+      try {
+        final Map<String, dynamic> profiles = jsonDecode(mapStr);
+        profiles.remove(cleanBucket);
+        await prefs.setString(_keyDiskProfilesMap, jsonEncode(profiles));
+      } catch (e) {
+        print("Error removing disk profile $cleanBucket: $e");
+      }
+    }
+
+    final active = prefs.getString(_keyActiveBucket);
+    if (active == cleanBucket) {
+      final remaining = await getSavedDiskNames();
+      if (remaining.isNotEmpty) {
+        await prefs.setString(_keyActiveBucket, remaining.first);
+      } else {
+        await prefs.remove(_keyActiveBucket);
+      }
+    }
+  }
+
   Future<List<String>> getSavedDiskNames() async {
     final prefs = await SharedPreferences.getInstance();
     final mapStr = prefs.getString(_keyDiskProfilesMap);
