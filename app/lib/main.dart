@@ -13,7 +13,7 @@ void main() {
 }
 
 class CloudNASApp extends StatelessWidget {
-  const CloudNASApp({Key? key}) : super(key: key);
+  const CloudNASApp({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -32,7 +32,7 @@ class CloudNASApp extends StatelessWidget {
 }
 
 class MainShell extends StatefulWidget {
-  const MainShell({Key? key}) : super(key: key);
+  const MainShell({super.key});
 
   @override
   State<MainShell> createState() => _MainShellState();
@@ -40,7 +40,7 @@ class MainShell extends StatefulWidget {
 
 class _MainShellState extends State<MainShell> {
   final _auth = AuthService();
-  int _activeTabIndex = 0;
+  int _activeTabIndex = 0; // Default: 0 = Files Explorer
 
   @override
   Widget build(BuildContext context) {
@@ -53,118 +53,108 @@ class _MainShellState extends State<MainShell> {
     final user = _auth.currentUser!;
 
     final List<Widget> tabs = [
+      const ExplorerView(),  // File Manager view as main/home tab
       const DashboardView(),
-      const ExplorerView(),
       const ChatView(),
       if (user.isAdmin) const UsersView(),
     ];
 
     return Scaffold(
-      body: SafeArea(
-        child: Column(
+      appBar: AppBar(
+        backgroundColor: const Color(0xFF1E1E2E),
+        elevation: 0,
+        title: Row(
           children: [
-            // Top Navigation & Header Bar
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-              decoration: const BoxDecoration(
-                color: Color(0xFF1E1E2E),
-                border: Border(bottom: BorderSide(color: Color(0xFF313244))),
-              ),
-              child: Row(
-                children: [
-                  const Icon(Icons.cloud_queue_rounded, color: Color(0xFF89B4FA), size: 28),
-                  const SizedBox(width: 12),
-                  Text(
-                    "CLOUD NAS",
-                    style: GoogleFonts.outfit(
-                      fontSize: 20,
-                      fontWeight: FontWeight.bold,
-                      color: const Color(0xFFCDD6F4),
-                      letterSpacing: 1.2,
-                    ),
-                  ),
-                  const SizedBox(width: 32),
-                  // Navigation Tabs
-                  Row(
-                    children: [
-                      _buildNavButton(0, "📊 Live Dashboard"),
-                      const SizedBox(width: 8),
-                      _buildNavButton(1, "📁 File Explorer"),
-                      const SizedBox(width: 8),
-                      _buildNavButton(2, "💬 Live Chat"),
-                      if (user.isAdmin) ...[
-                        const SizedBox(width: 8),
-                        _buildNavButton(3, "👥 Users & Permissions"),
-                      ],
-                    ],
-                  ),
-                  const Spacer(),
-                  // Active User Badge & Logout Button
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF313244),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Row(
-                      children: [
-                        const Icon(Icons.person_rounded, color: Color(0xFFA6E3A1), size: 16),
-                        const SizedBox(width: 6),
-                        Text(
-                          user.username,
-                          style: GoogleFonts.inter(
-                            color: const Color(0xFFCDD6F4),
-                            fontWeight: FontWeight.bold,
-                            fontSize: 13,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  IconButton(
-                    icon: const Icon(Icons.logout_rounded, color: Color(0xFFF38BA8), size: 20),
-                    onPressed: () {
-                      _auth.logout();
-                      setState(() => _activeTabIndex = 0);
-                    },
-                    tooltip: "Logout",
-                  ),
-                ],
-              ),
-            ),
-            // Active Tab View Content
-            Expanded(
-              child: IndexedStack(
-                index: _activeTabIndex,
-                children: tabs,
+            const Icon(Icons.cloud_queue_rounded, color: Color(0xFF89B4FA), size: 24),
+            const SizedBox(width: 8),
+            Text(
+              "CLOUD NAS",
+              style: GoogleFonts.outfit(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                color: const Color(0xFFCDD6F4),
+                letterSpacing: 1.2,
               ),
             ),
           ],
         ),
+        actions: [
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+            decoration: BoxDecoration(
+              color: const Color(0xFF313244),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(Icons.person_rounded, color: Color(0xFFA6E3A1), size: 14),
+                const SizedBox(width: 4),
+                Text(
+                  user.username,
+                  style: GoogleFonts.inter(
+                    color: const Color(0xFFCDD6F4),
+                    fontWeight: FontWeight.bold,
+                    fontSize: 12,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          PopupMenuButton<String>(
+            icon: const Icon(Icons.more_vert_rounded, color: Color(0xFFCDD6F4)),
+            color: const Color(0xFF1E1E2E),
+            onSelected: (val) {
+              if (val == 'logout') {
+                _auth.logout();
+                setState(() => _activeTabIndex = 0);
+              }
+            },
+            itemBuilder: (ctx) => [
+              PopupMenuItem(
+                value: 'logout',
+                child: Row(
+                  children: [
+                    const Icon(Icons.logout_rounded, color: Color(0xFFF38BA8), size: 18),
+                    const SizedBox(width: 8),
+                    Text("Logout", style: GoogleFonts.inter(color: const Color(0xFFF38BA8), fontWeight: FontWeight.bold)),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ],
       ),
-    );
-  }
-
-  Widget _buildNavButton(int index, String label) {
-    final isSelected = _activeTabIndex == index;
-    return ElevatedButton(
-      onPressed: () => setState(() => _activeTabIndex = index),
-      style: ElevatedButton.styleFrom(
-        backgroundColor: isSelected ? const Color(0xFF89B4FA) : const Color(0xFF181825),
-        foregroundColor: isSelected ? const Color(0xFF11111B) : const Color(0xFFCDD6F4),
-        elevation: 0,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(8),
-        ),
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+      body: IndexedStack(
+        index: _activeTabIndex,
+        children: tabs,
       ),
-      child: Text(
-        label,
-        style: GoogleFonts.inter(
-          fontWeight: FontWeight.bold,
-          fontSize: 13,
-        ),
+      bottomNavigationBar: BottomNavigationBar(
+        currentIndex: _activeTabIndex,
+        onTap: (index) => setState(() => _activeTabIndex = index),
+        backgroundColor: const Color(0xFF1E1E2E),
+        selectedItemColor: const Color(0xFF89B4FA),
+        unselectedItemColor: const Color(0xFFA6ADC8),
+        type: BottomNavigationBarType.fixed,
+        items: [
+          const BottomNavigationBarItem(
+            icon: Icon(Icons.folder_rounded),
+            label: "Files",
+          ),
+          const BottomNavigationBarItem(
+            icon: Icon(Icons.dashboard_rounded),
+            label: "Dashboard",
+          ),
+          const BottomNavigationBarItem(
+            icon: Icon(Icons.chat_bubble_rounded),
+            label: "Chat",
+          ),
+          if (user.isAdmin)
+            const BottomNavigationBarItem(
+              icon: Icon(Icons.people_rounded),
+              label: "Users",
+            ),
+        ],
       ),
     );
   }

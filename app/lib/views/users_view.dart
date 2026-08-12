@@ -5,7 +5,7 @@ import '../models/user_model.dart';
 import '../services/auth_service.dart';
 
 class UsersView extends StatefulWidget {
-  const UsersView({Key? key}) : super(key: key);
+  const UsersView({super.key});
 
   @override
   State<UsersView> createState() => _UsersViewState();
@@ -18,7 +18,7 @@ class _UsersViewState extends State<UsersView> {
   final _folderPathController = TextEditingController(text: "/");
 
   String _selectedRole = "User";
-  String _selectedScope = "Specific Folder";
+  final String _selectedScope = "Specific Folder";
   String _selectedPermission = "Read-Write";
   bool _isSaving = false;
 
@@ -50,16 +50,12 @@ class _UsersViewState extends State<UsersView> {
     final success = await _auth.addUser(newUser);
     setState(() => _isSaving = false);
 
-    if (success) {
+    if (success && mounted) {
       _usernameController.clear();
       _passwordController.clear();
       _folderPathController.text = "/";
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text("User '$username' saved successfully!")),
-      );
-    } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Failed to save user.")),
       );
     }
   }
@@ -93,150 +89,89 @@ class _UsersViewState extends State<UsersView> {
 
   @override
   Widget build(BuildContext context) {
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(24.0),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Add User Form Card
-          Container(
-            padding: const EdgeInsets.all(20.0),
-            decoration: BoxDecoration(
-              color: const Color(0xFF1E1E2E),
-              borderRadius: BorderRadius.circular(14),
-              border: Border.all(color: const Color(0xFF313244)),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  "➕ ADD NEW USER & ACCESS PERMISSION",
-                  style: GoogleFonts.outfit(
-                    fontSize: 14,
-                    fontWeight: FontWeight.bold,
-                    color: const Color(0xFFCDD6F4),
-                    letterSpacing: 1,
-                  ),
+    return Scaffold(
+      backgroundColor: const Color(0xFF181825),
+      body: SafeArea(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(16.0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Add User Form Card
+              Container(
+                padding: const EdgeInsets.all(16.0),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF1E1E2E),
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(color: const Color(0xFF313244)),
                 ),
-                const SizedBox(height: 16),
-                Row(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Expanded(
-                      child: TextField(
-                        controller: _usernameController,
-                        style: GoogleFonts.inter(color: const Color(0xFFCDD6F4)),
-                        decoration: InputDecoration(
-                          labelText: "Username",
-                          labelStyle: GoogleFonts.inter(color: const Color(0xFFA6ADC8)),
-                          filled: true,
-                          fillColor: const Color(0xFF181825),
-                          enabledBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(10),
-                            borderSide: const BorderSide(color: Color(0xFF313244)),
-                          ),
-                          focusedBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(10),
-                            borderSide: const BorderSide(color: Color(0xFF89B4FA)),
-                          ),
-                        ),
+                    Text(
+                      "➕ ADD NEW USER",
+                      style: GoogleFonts.outfit(
+                        fontSize: 14,
+                        fontWeight: FontWeight.bold,
+                        color: const Color(0xFFCDD6F4),
+                        letterSpacing: 1,
                       ),
                     ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: TextField(
-                        controller: _passwordController,
-                        obscureText: true,
-                        style: GoogleFonts.inter(color: const Color(0xFFCDD6F4)),
-                        decoration: InputDecoration(
-                          labelText: "Password",
-                          labelStyle: GoogleFonts.inter(color: const Color(0xFFA6ADC8)),
-                          filled: true,
-                          fillColor: const Color(0xFF181825),
-                          enabledBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(10),
-                            borderSide: const BorderSide(color: Color(0xFF313244)),
-                          ),
-                          focusedBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(10),
-                            borderSide: const BorderSide(color: Color(0xFF89B4FA)),
+                    const SizedBox(height: 14),
+                    TextField(
+                      controller: _usernameController,
+                      style: GoogleFonts.inter(color: const Color(0xFFCDD6F4), fontSize: 14),
+                      decoration: _inputDecoration("Username"),
+                    ),
+                    const SizedBox(height: 10),
+                    TextField(
+                      controller: _passwordController,
+                      obscureText: true,
+                      style: GoogleFonts.inter(color: const Color(0xFFCDD6F4), fontSize: 14),
+                      decoration: _inputDecoration("Password"),
+                    ),
+                    const SizedBox(height: 10),
+                    TextField(
+                      controller: _folderPathController,
+                      style: GoogleFonts.inter(color: const Color(0xFFCDD6F4), fontSize: 14),
+                      decoration: _inputDecoration("Folder Path (e.g. /Philip)"),
+                    ),
+                    const SizedBox(height: 10),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: DropdownButtonFormField<String>(
+                            initialValue: _selectedRole,
+                            dropdownColor: const Color(0xFF181825),
+                            style: GoogleFonts.inter(color: const Color(0xFFCDD6F4), fontSize: 13),
+                            decoration: _inputDecoration("Role"),
+                            items: const [
+                              DropdownMenuItem(value: "User", child: Text("User")),
+                              DropdownMenuItem(value: "Admin", child: Text("Admin")),
+                            ],
+                            onChanged: (v) => setState(() => _selectedRole = v!),
                           ),
                         ),
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: TextField(
-                        controller: _folderPathController,
-                        style: GoogleFonts.inter(color: const Color(0xFFCDD6F4)),
-                        decoration: InputDecoration(
-                          labelText: "Folder Path (e.g. /Philip)",
-                          labelStyle: GoogleFonts.inter(color: const Color(0xFFA6ADC8)),
-                          filled: true,
-                          fillColor: const Color(0xFF181825),
-                          enabledBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(10),
-                            borderSide: const BorderSide(color: Color(0xFF313244)),
-                          ),
-                          focusedBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(10),
-                            borderSide: const BorderSide(color: Color(0xFF89B4FA)),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: DropdownButtonFormField<String>(
+                            initialValue: _selectedPermission,
+                            dropdownColor: const Color(0xFF181825),
+                            style: GoogleFonts.inter(color: const Color(0xFFCDD6F4), fontSize: 13),
+                            decoration: _inputDecoration("Permission"),
+                            items: const [
+                              DropdownMenuItem(value: "Read-Write", child: Text("Read-Write")),
+                              DropdownMenuItem(value: "Read-Only", child: Text("Read-Only")),
+                            ],
+                            onChanged: (v) => setState(() => _selectedPermission = v!),
                           ),
                         ),
-                      ),
+                      ],
                     ),
-                  ],
-                ),
-                const SizedBox(height: 16),
-                Row(
-                  children: [
-                    Expanded(
-                      child: DropdownButtonFormField<String>(
-                        initialValue: _selectedRole,
-                        dropdownColor: const Color(0xFF181825),
-                        style: GoogleFonts.inter(color: const Color(0xFFCDD6F4)),
-                        decoration: InputDecoration(
-                          labelText: "Role",
-                          labelStyle: GoogleFonts.inter(color: const Color(0xFFA6ADC8)),
-                          filled: true,
-                          fillColor: const Color(0xFF181825),
-                          enabledBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(10),
-                            borderSide: const BorderSide(color: Color(0xFF313244)),
-                          ),
-                        ),
-                        items: const [
-                          DropdownMenuItem(value: "User", child: Text("User")),
-                          DropdownMenuItem(value: "Admin", child: Text("Admin")),
-                        ],
-                        onChanged: (v) => setState(() => _selectedRole = v!),
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: DropdownButtonFormField<String>(
-                        initialValue: _selectedPermission,
-                        dropdownColor: const Color(0xFF181825),
-                        style: GoogleFonts.inter(color: const Color(0xFFCDD6F4)),
-                        decoration: InputDecoration(
-                          labelText: "Permission",
-                          labelStyle: GoogleFonts.inter(color: const Color(0xFFA6ADC8)),
-                          filled: true,
-                          fillColor: const Color(0xFF181825),
-                          enabledBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(10),
-                            borderSide: const BorderSide(color: Color(0xFF313244)),
-                          ),
-                        ),
-                        items: const [
-                          DropdownMenuItem(value: "Read-Write", child: Text("Read-Write")),
-                          DropdownMenuItem(value: "Read-Only", child: Text("Read-Only")),
-                        ],
-                        onChanged: (v) => setState(() => _selectedPermission = v!),
-                      ),
-                    ),
-                    const SizedBox(width: 12),
+                    const SizedBox(height: 14),
                     SizedBox(
-                      height: 52,
+                      width: double.infinity,
+                      height: 44,
                       child: ElevatedButton.icon(
                         onPressed: _isSaving ? null : _addUser,
                         icon: const Icon(Icons.person_add_rounded, size: 18),
@@ -244,56 +179,73 @@ class _UsersViewState extends State<UsersView> {
                         style: ElevatedButton.styleFrom(
                           backgroundColor: const Color(0xFF89B4FA),
                           foregroundColor: const Color(0xFF11111B),
-                          padding: const EdgeInsets.symmetric(horizontal: 20),
                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                         ),
                       ),
                     ),
                   ],
                 ),
-              ],
-            ),
+              ),
+              const SizedBox(height: 16),
+              // Users List Table
+              Container(
+                decoration: BoxDecoration(
+                  color: const Color(0xFF1E1E2E),
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(color: const Color(0xFF313244)),
+                ),
+                child: ListView.separated(
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  itemCount: _auth.usersList.length,
+                  separatorBuilder: (ctx, i) => const Divider(color: Color(0xFF313244), height: 1),
+                  itemBuilder: (ctx, i) {
+                    final u = _auth.usersList[i];
+                    return ListTile(
+                      leading: CircleAvatar(
+                        backgroundColor: u.isAdmin ? const Color(0xFFCBA6F7) : const Color(0xFF89B4FA),
+                        child: Text(
+                          u.username[0].toUpperCase(),
+                          style: GoogleFonts.inter(color: const Color(0xFF11111B), fontWeight: FontWeight.bold),
+                        ),
+                      ),
+                      title: Text(
+                        "${u.username} (${u.role})",
+                        style: GoogleFonts.inter(color: const Color(0xFFCDD6F4), fontWeight: FontWeight.bold),
+                      ),
+                      subtitle: Text(
+                        "Path: ${u.folderPath} • ${u.permission}",
+                        style: GoogleFonts.inter(color: const Color(0xFFA6ADC8), fontSize: 12),
+                      ),
+                      trailing: IconButton(
+                        icon: const Icon(Icons.delete_outline_rounded, color: Color(0xFFF38BA8)),
+                        onPressed: () => _deleteUser(u.username),
+                      ),
+                    );
+                  },
+                ),
+              ),
+            ],
           ),
-          const SizedBox(height: 24),
-          // Users List Table
-          Container(
-            decoration: BoxDecoration(
-              color: const Color(0xFF1E1E2E),
-              borderRadius: BorderRadius.circular(14),
-              border: Border.all(color: const Color(0xFF313244)),
-            ),
-            child: ListView.separated(
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              itemCount: _auth.usersList.length,
-              separatorBuilder: (ctx, i) => const Divider(color: Color(0xFF313244), height: 1),
-              itemBuilder: (ctx, i) {
-                final u = _auth.usersList[i];
-                return ListTile(
-                  leading: CircleAvatar(
-                    backgroundColor: u.isAdmin ? const Color(0xFFCBA6F7) : const Color(0xFF89B4FA),
-                    child: Text(
-                      u.username[0].toUpperCase(),
-                      style: GoogleFonts.inter(color: const Color(0xFF11111B), fontWeight: FontWeight.bold),
-                    ),
-                  ),
-                  title: Text(
-                    "${u.username} (${u.role})",
-                    style: GoogleFonts.inter(color: const Color(0xFFCDD6F4), fontWeight: FontWeight.bold),
-                  ),
-                  subtitle: Text(
-                    "Scope: ${u.folderPath}  •  Permission: ${u.permission}",
-                    style: GoogleFonts.inter(color: const Color(0xFFA6ADC8), fontSize: 12),
-                  ),
-                  trailing: IconButton(
-                    icon: const Icon(Icons.delete_outline_rounded, color: Color(0xFFF38BA8)),
-                    onPressed: () => _deleteUser(u.username),
-                  ),
-                );
-              },
-            ),
-          ),
-        ],
+        ),
+      ),
+    );
+  }
+
+  InputDecoration _inputDecoration(String label) {
+    return InputDecoration(
+      labelText: label,
+      labelStyle: GoogleFonts.inter(color: const Color(0xFFA6ADC8), fontSize: 12),
+      filled: true,
+      fillColor: const Color(0xFF181825),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(10),
+        borderSide: const BorderSide(color: Color(0xFF313244)),
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(10),
+        borderSide: const BorderSide(color: Color(0xFF89B4FA)),
       ),
     );
   }

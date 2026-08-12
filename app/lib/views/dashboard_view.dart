@@ -4,7 +4,7 @@ import '../services/auth_service.dart';
 import '../services/gcs_service.dart';
 
 class DashboardView extends StatefulWidget {
-  const DashboardView({Key? key}) : super(key: key);
+  const DashboardView({super.key});
 
   @override
   State<DashboardView> createState() => _DashboardViewState();
@@ -53,118 +53,113 @@ class _DashboardViewState extends State<DashboardView> {
   Widget build(BuildContext context) {
     final user = _auth.currentUser;
 
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(24.0),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Banner Card
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(24.0),
-            decoration: BoxDecoration(
-              gradient: const LinearGradient(
-                colors: [Color(0xFF1E1E2E), Color(0xFF313244)],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-              ),
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: const Color(0xFF45475A)),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
+    return Scaffold(
+      backgroundColor: const Color(0xFF181825),
+      body: SafeArea(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(16.0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Banner Card
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(20.0),
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(
+                    colors: [Color(0xFF1E1E2E), Color(0xFF313244)],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: const Color(0xFF45475A)),
+                ),
+                child: Row(
                   children: [
                     Container(
                       padding: const EdgeInsets.all(12),
                       decoration: BoxDecoration(
-                        color: const Color(0xFF89B4FA).withOpacity(0.15),
+                        color: const Color(0xFF89B4FA).withValues(alpha: 0.15),
                         borderRadius: BorderRadius.circular(12),
                       ),
                       child: const Icon(Icons.cloud_done_rounded, color: Color(0xFF89B4FA), size: 32),
                     ),
-                    const SizedBox(width: 16),
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          "Welcome back, ${user?.username ?? 'User'}!",
-                          style: GoogleFonts.outfit(
-                            fontSize: 22,
-                            fontWeight: FontWeight.bold,
-                            color: const Color(0xFFCDD6F4),
+                    const SizedBox(width: 14),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            "Welcome back, ${user?.username ?? 'User'}!",
+                            style: GoogleFonts.outfit(
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                              color: const Color(0xFFCDD6F4),
+                            ),
                           ),
-                        ),
-                        Text(
-                          "Folder Scope: ${user?.folderPath} (${user?.permission})",
-                          style: GoogleFonts.inter(
-                            fontSize: 13,
-                            color: const Color(0xFFA6ADC8),
+                          const SizedBox(height: 4),
+                          Text(
+                            "Scope: ${user?.folderPath} (${user?.permission})",
+                            style: GoogleFonts.inter(
+                              fontSize: 12,
+                              color: const Color(0xFFA6ADC8),
+                            ),
                           ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
                   ],
                 ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 24),
-          // Stats Row
-          Row(
-            children: [
-              Expanded(
-                child: _buildStatCard(
-                  title: "Total Files",
-                  value: _isLoading ? "..." : "$_totalFiles",
-                  icon: Icons.insert_drive_file_outlined,
-                  color: const Color(0xFF89B4FA),
-                ),
               ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: _buildStatCard(
-                  title: "Storage Used",
-                  value: _isLoading ? "..." : _formatSize(_totalSize),
-                  icon: Icons.sd_storage_outlined,
-                  color: const Color(0xFFA6E3A1),
-                ),
-              ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: _buildStatCard(
-                  title: "Cloud Engine",
-                  value: "Google Cloud (gcsnas)",
-                  icon: Icons.cloud_queue_rounded,
-                  color: const Color(0xFFCBA6F7),
-                ),
+              const SizedBox(height: 16),
+              // Responsive Stat Cards
+              LayoutBuilder(
+                builder: (ctx, constraints) {
+                  bool isWide = constraints.maxWidth >= 600;
+                  if (isWide) {
+                    return Row(
+                      children: [
+                        Expanded(child: _buildStatCard("Total Files", _isLoading ? "..." : "$_totalFiles", Icons.insert_drive_file_outlined, const Color(0xFF89B4FA))),
+                        const SizedBox(width: 12),
+                        Expanded(child: _buildStatCard("Storage Used", _isLoading ? "..." : _formatSize(_totalSize), Icons.sd_storage_outlined, const Color(0xFFA6E3A1))),
+                        const SizedBox(width: 12),
+                        Expanded(child: _buildStatCard("Cloud Engine", "Google Cloud", Icons.cloud_queue_rounded, const Color(0xFFCBA6F7))),
+                      ],
+                    );
+                  } else {
+                    return Column(
+                      children: [
+                        _buildStatCard("Total Files", _isLoading ? "..." : "$_totalFiles", Icons.insert_drive_file_outlined, const Color(0xFF89B4FA)),
+                        const SizedBox(height: 12),
+                        _buildStatCard("Storage Used", _isLoading ? "..." : _formatSize(_totalSize), Icons.sd_storage_outlined, const Color(0xFFA6E3A1)),
+                        const SizedBox(height: 12),
+                        _buildStatCard("Cloud Engine", "Google Cloud (gcsnas)", Icons.cloud_queue_rounded, const Color(0xFFCBA6F7)),
+                      ],
+                    );
+                  }
+                },
               ),
             ],
           ),
-        ],
+        ),
       ),
     );
   }
 
-  Widget _buildStatCard({
-    required String title,
-    required String value,
-    required IconData icon,
-    required Color color,
-  }) {
+  Widget _buildStatCard(String title, String value, IconData icon, Color color) {
     return Container(
-      padding: const EdgeInsets.all(20.0),
+      width: double.infinity,
+      padding: const EdgeInsets.all(18.0),
       decoration: BoxDecoration(
         color: const Color(0xFF1E1E2E),
         borderRadius: BorderRadius.circular(14),
         border: Border.all(color: const Color(0xFF313244)),
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
                 title.toUpperCase(),
@@ -175,17 +170,20 @@ class _DashboardViewState extends State<DashboardView> {
                   letterSpacing: 1,
                 ),
               ),
-              Icon(icon, color: color, size: 22),
+              const SizedBox(height: 6),
+              Text(
+                value,
+                style: GoogleFonts.outfit(
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                  color: const Color(0xFFCDD6F4),
+                ),
+              ),
             ],
           ),
-          const SizedBox(height: 12),
-          Text(
-            value,
-            style: GoogleFonts.outfit(
-              fontSize: 20,
-              fontWeight: FontWeight.bold,
-              color: const Color(0xFFCDD6F4),
-            ),
+          CircleAvatar(
+            backgroundColor: color.withValues(alpha: 0.15),
+            child: Icon(icon, color: color, size: 22),
           ),
         ],
       ),
