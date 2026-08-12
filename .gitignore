@@ -1,18 +1,40 @@
-# Python & OS Temp Files
-__pycache__/
-*.pyc
+# GCP Service Account Keys & Secrets
+*.json
+!app/web/manifest.json
+!**/Contents.json
+
+# Local Configuration & Session Files
+drive_config.json
+active_user_mount.json
+users_permissions.json
+leena-it-solutions-*.json
+
+# OS & Temp Files
 .DS_Store
 Thumbs.db
+__pycache__/
+*.pyc
 System Volume Information/
 cloud_nas_error.log
 cloud_nas_gui_error.log
 
-# Rclone Local Binaries
+# Rclone Binaries & Downloads
 rclone
 rclone.exe
+rclone_download.zip
+rclone_temp/
 mac/rclone
 windows/rclone.exe
+software/rclone
+software/rclone.exe
+software/mac/rclone
+software/windows/rclone.exe
 
-# Local Mount Configuration Cache
-active_user_mount.json
-temp_*.json
+# Flutter / App Build Output
+app/.dart_tool/
+app/.flutter-plugins
+app/.flutter-plugins-dependencies
+app/.packages
+app/build/
+app/.pub-cache/
+app/.pub/

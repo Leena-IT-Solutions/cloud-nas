@@ -1,0 +1,17 @@
+# GCP Service Account Keys & Secrets
+*.json
+
+# OS & Temp Files
+__pycache__/
+*.pyc
+.DS_Store
+Thumbs.db
+System Volume Information/
+cloud_nas_error.log
+cloud_nas_gui_error.log
+
+# Rclone Binaries
+rclone
+rclone.exe
+mac/rclone
+windows/rclone.exe
