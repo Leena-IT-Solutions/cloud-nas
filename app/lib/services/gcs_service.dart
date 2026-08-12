@@ -1,5 +1,4 @@
 import 'dart:convert';
-import 'dart:typed_data';
 import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
 import 'package:dart_jsonwebtoken/dart_jsonwebtoken.dart';
@@ -10,16 +9,27 @@ class GCSService {
   factory GCSService() => _instance;
   GCSService._internal();
 
-  static const String bucketName = "sv-school";
-  Map<String, dynamic>? _serviceAccountKey;
+  String bucketName = "sv-school";
+  Map<String, dynamic>? customKeyJson;
   String? _accessToken;
   DateTime? _tokenExpiry;
+  bool isConnected = false;
+
+  void configure({required String bucket, Map<String, dynamic>? keyJson}) {
+    bucketName = bucket.trim().isEmpty ? "sv-school" : bucket.trim();
+    if (keyJson != null) {
+      customKeyJson = keyJson;
+    }
+    _accessToken = null;
+    _tokenExpiry = null;
+    isConnected = false;
+  }
 
   Future<void> _loadKey() async {
-    if (_serviceAccountKey != null) return;
+    if (customKeyJson != null) return;
     try {
       final jsonString = await rootBundle.loadString('assets/gcp_key.json');
-      _serviceAccountKey = jsonDecode(jsonString);
+      customKeyJson = jsonDecode(jsonString);
     } catch (e) {
       print("Error loading GCP key asset: $e");
     }
@@ -31,11 +41,13 @@ class GCSService {
     }
 
     await _loadKey();
-    if (_serviceAccountKey == null) return null;
+    if (customKeyJson == null) return null;
 
-    final clientEmail = _serviceAccountKey!['client_email'];
-    final privateKeyPem = _serviceAccountKey!['private_key'];
-    final tokenUri = _serviceAccountKey!['token_uri'] ?? 'https://oauth2.googleapis.com/token';
+    final clientEmail = customKeyJson!['client_email'];
+    final privateKeyPem = customKeyJson!['private_key'];
+    final tokenUri = customKeyJson!['token_uri'] ?? 'https://oauth2.googleapis.com/token';
+
+    if (clientEmail == null || privateKeyPem == null) return null;
 
     final iat = DateTime.now().millisecondsSinceEpoch ~/ 1000;
     final exp = iat + 3600;
@@ -68,6 +80,7 @@ class GCSService {
         _accessToken = data['access_token'];
         final expiresIn = data['expires_in'] ?? 3600;
         _tokenExpiry = DateTime.now().add(Duration(seconds: expiresIn - 60));
+        isConnected = true;
         return _accessToken;
       } else {
         print("Failed to fetch access token: ${response.body}");
@@ -76,6 +89,29 @@ class GCSService {
       print("OAuth Token Exception: $e");
     }
     return null;
+  }
+
+  Future<bool> testConnection() async {
+    final token = await getAccessToken();
+    if (token == null) return false;
+
+    final url = Uri.parse(
+      'https://storage.googleapis.com/storage/v1/b/$bucketName/o?maxResults=1'
+    );
+
+    try {
+      final response = await http.get(
+        url,
+        headers: {'Authorization': 'Bearer $token'},
+      );
+      if (response.statusCode == 200) {
+        isConnected = true;
+        return true;
+      }
+    } catch (e) {
+      print("GCS Test Connection Error: $e");
+    }
+    return false;
   }
 
   Future<List<FileItem>> listFiles(String prefix) async {
@@ -126,7 +162,7 @@ class GCSService {
           for (var item in data['items']) {
             String path = item['name'] ?? '';
             if (path == cleanPrefix || path.endsWith('.keep') || path.contains('/.sys/')) {
-              continue; // Skip directory placeholder, .keep, or system folder
+              continue;
             }
 
             String name = path.split('/').last;
