@@ -8,7 +8,7 @@
 PRODUCT_NAME = CLOUD NAS
 
 // The application's bundle identifier
-PRODUCT_BUNDLE_IDENTIFIER = com.cloudnas.app
+PRODUCT_BUNDLE_IDENTIFIER = com.infoleena.cloud.nas
 
 // The copyright displayed in application information
 PRODUCT_COPYRIGHT = Copyright © 2026 com.cloudnas. All rights reserved.
