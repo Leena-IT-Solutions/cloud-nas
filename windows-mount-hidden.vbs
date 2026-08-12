@@ -6,7 +6,7 @@ rcloneBin = scriptDir & "\rclone.exe"
 keyFile = scriptDir & "\leena-it-solutions-412315-f63f3bd287c1.json"
 activeUserFile = scriptDir & "\active_user_mount.json"
 
-' Terminate existing rclone webdav processes & unmount Z: drive
+' Terminate existing rclone processes & unmount Z: drive
 WshShell.Run "taskkill /f /im rclone.exe", 0, True
 WshShell.Run "net use Z: /delete /yes", 0, True
 
@@ -39,7 +39,7 @@ If fso.FileExists(activeUserFile) Then
     End If
 End If
 
-' Start Rclone WebDAV Engine on port 8080 (100% Native Windows, 0 External Dependencies)
+' Start Rclone WebDAV Engine on port 8080 (100% Native Windows)
 cmd = """" & rcloneBin & """ serve webdav " & remotePath & " --addr 127.0.0.1:8080 --vfs-cache-mode full --vfs-cache-max-size 10G --vfs-cache-max-age 24h --vfs-write-back 1s --dir-cache-time 10s --attr-timeout 1s --gcs-bucket-policy-only --rc --rc-no-auth --rc-addr 127.0.0.1:5572 --no-modtime " & readOnlyFlag
 WshShell.Run cmd, 0, False
 
@@ -47,4 +47,5 @@ WScript.Sleep 2000
 
 ' Ensure WebClient service is running and mount Z: drive natively
 WshShell.Run "net start WebClient", 0, True
-WshShell.Run "net use Z: http://127.0.0.1:8080 /persistent:no", 0, True
+WshShell.Run "net use Z: http://127.0.0.1:8080/ /persistent:no", 0, True
+WshShell.Run "net use Z: \\127.0.0.1@8080\DavWWWRoot /persistent:no", 0, True

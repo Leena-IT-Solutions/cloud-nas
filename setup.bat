@@ -48,8 +48,9 @@ if not exist "%RCLONE_BIN%" (
 )
 echo [OK] Rclone Binary Ready: %RCLONE_BIN%
 
-rem 3. Start Windows Native WebClient Service (Zero External Drivers Required!)
+rem 3. Start Windows Native WebClient Service & Configure Registry
 echo [INFO] Enabling Windows Native WebClient Service...
+reg add HKLM\SYSTEM\CurrentControlSet\Services\WebClient\Parameters /v BasicAuthLevel /t REG_DWORD /d 2 /f >nul 2>&1
 sc config WebClient start= auto >nul 2>&1
 net start WebClient >nul 2>&1
 
