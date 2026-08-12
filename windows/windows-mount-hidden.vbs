@@ -2,9 +2,11 @@ Set WshShell = CreateObject("WScript.Shell")
 Set fso = CreateObject("Scripting.FileSystemObject")
 
 scriptDir = fso.GetParentFolderName(WScript.ScriptFullName)
+projectRoot = fso.GetParentFolderName(scriptDir)
+
 rcloneBin = scriptDir & "\rclone.exe"
-keyFile = scriptDir & "\leena-it-solutions-412315-f63f3bd287c1.json"
-activeUserFile = scriptDir & "\active_user_mount.json"
+keyFile = projectRoot & "\leena-it-solutions-412315-f63f3bd287c1.json"
+activeUserFile = projectRoot & "\active_user_mount.json"
 
 ' Function to find first unused drive letter (resolves Virtual Machine shared drive collisions)
 Function GetFreeDriveLetter()

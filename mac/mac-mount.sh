@@ -2,6 +2,8 @@
 
 # macOS Cloud NAS Auto-Mount Script with User Permission & Folder Scoping
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+PROJECT_ROOT="$( cd "$SCRIPT_DIR/.." && pwd )"
+
 RCLONE_BIN="$SCRIPT_DIR/rclone"
 
 # Fallback to system rclone if local binary not found
@@ -9,8 +11,8 @@ if [ ! -f "$RCLONE_BIN" ]; then
     RCLONE_BIN="rclone"
 fi
 
-CONFIG_FILE="$SCRIPT_DIR/drive_config.json"
-ACTIVE_USER_FILE="$SCRIPT_DIR/active_user_mount.json"
+CONFIG_FILE="$PROJECT_ROOT/drive_config.json"
+ACTIVE_USER_FILE="$PROJECT_ROOT/active_user_mount.json"
 
 VOL_NAME="Cloud NAS"
 if [ -f "$CONFIG_FILE" ]; then

@@ -2,11 +2,14 @@
 setlocal enabledelayedexpansion
 
 :: Windows Cloud NAS Diagnostic and Test Tool
-set SCRIPT_DIR=%~dp0
-set KEY_FILE=%SCRIPT_DIR%leena-it-solutions-412315-f63f3bd287c1.json
-set BUCKET_NAME=sv-school
-set REMOTE_NAME=gcsnas
-set DRIVE_LETTER=Y:
+set "SCRIPT_DIR=%~dp0"
+set "SCRIPT_DIR=%SCRIPT_DIR:~0,-1%"
+for %%I in ("%SCRIPT_DIR%\..") do set "PROJECT_ROOT=%%~fI"
+
+set "KEY_FILE=%PROJECT_ROOT%\leena-it-solutions-412315-f63f3bd287c1.json"
+set "BUCKET_NAME=sv-school"
+set "REMOTE_NAME=gcsnas"
+set "DRIVE_LETTER=Y:"
 
 echo ============================================================
 echo       🔍 Windows Cloud NAS Diagnostic and Test Tool 🔍
@@ -37,12 +40,12 @@ echo.
 
 :: Test 3: Check Rclone Binary
 echo [TEST 3] Checking Rclone Binary...
-set RCLONE_BIN=C:\rclone\rclone.exe
+set "RCLONE_BIN=%SCRIPT_DIR%\rclone.exe"
 if not exist "%RCLONE_BIN%" (
-    if exist "%SCRIPT_DIR%rclone.exe" (
-        set RCLONE_BIN=%SCRIPT_DIR%rclone.exe
+    if exist "C:\rclone\rclone.exe" (
+        set "RCLONE_BIN=C:\rclone\rclone.exe"
     ) else (
-        set RCLONE_BIN=rclone.exe
+        set "RCLONE_BIN=rclone.exe"
     )
 )
 
@@ -72,6 +75,7 @@ echo ============================================================
 echo.
 
 "%RCLONE_BIN%" mount %REMOTE_NAME%:%BUCKET_NAME% %DRIVE_LETTER% ^
+    --network-mode ^
     --vfs-cache-mode full ^
     --vfs-cache-max-size 10G ^
     --vfs-cache-max-age 24h ^
