@@ -40,7 +40,7 @@ If fso.FileExists(activeUserFile) Then
 End If
 
 ' 1. Primary Attempt: Native Direct Rclone Drive Mount (Z:)
-cmdMount = """" & rcloneBin & """ mount " & remotePath & " Z: --vfs-cache-mode full --vfs-cache-max-size 10G --vfs-cache-max-age 24h --vfs-write-back 1s --dir-cache-time 10s --attr-timeout 1s --gcs-bucket-policy-only --rc --rc-no-auth --rc-addr 127.0.0.1:5572 --no-modtime " & readOnlyFlag
+cmdMount = """" & rcloneBin & """ mount " & remotePath & " Z: --vfs-cache-mode full --vfs-cache-max-size 10G --vfs-cache-max-age 24h --vfs-write-back 1s --dir-cache-time 10s --attr-timeout 1s --gcs-bucket-policy-only --rc --rc-no-auth --rc-addr 127.0.0.1:5572 --no-modtime --log-level NOTICE " & readOnlyFlag
 WshShell.Run cmdMount, 0, False
 
 WScript.Sleep 2500
@@ -48,7 +48,7 @@ WScript.Sleep 2500
 ' 2. Fallback Attempt: If Z: drive is not active, launch WebDAV serve + WebClient Net Use
 If Not fso.FolderExists("Z:\") Then
     WshShell.Run "taskkill /f /im rclone.exe", 0, True
-    cmdWebdav = """" & rcloneBin & """ serve webdav " & remotePath & " --addr 127.0.0.1:8080 --vfs-cache-mode full --vfs-cache-max-size 10G --vfs-cache-max-age 24h --vfs-write-back 1s --dir-cache-time 10s --attr-timeout 1s --gcs-bucket-policy-only --rc --rc-no-auth --rc-addr 127.0.0.1:5572 --no-modtime " & readOnlyFlag
+    cmdWebdav = """" & rcloneBin & """ serve webdav " & remotePath & " --addr 127.0.0.1:8080 --vfs-cache-mode full --vfs-cache-max-size 10G --vfs-cache-max-age 24h --vfs-write-back 1s --dir-cache-time 10s --attr-timeout 1s --gcs-bucket-policy-only --rc --rc-no-auth --rc-addr 127.0.0.1:5572 --no-modtime --log-level NOTICE " & readOnlyFlag
     WshShell.Run cmdWebdav, 0, False
     WScript.Sleep 2000
     WshShell.Run "net start WebClient", 0, True

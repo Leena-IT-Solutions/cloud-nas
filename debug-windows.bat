@@ -1,7 +1,7 @@
 @echo off
 setlocal enabledelayedexpansion
 
-:: Windows Cloud NAS Diagnostic & Test Tool
+:: Windows Cloud NAS Diagnostic and Test Tool
 set SCRIPT_DIR=%~dp0
 set KEY_FILE=%SCRIPT_DIR%leena-it-solutions-412315-f63f3bd287c1.json
 set BUCKET_NAME=sv-school
@@ -9,7 +9,7 @@ set REMOTE_NAME=gcsnas
 set DRIVE_LETTER=Y:
 
 echo ============================================================
-echo       🔍 Windows Cloud NAS Diagnostic & Test Tool 🔍
+echo       🔍 Windows Cloud NAS Diagnostic and Test Tool 🔍
 echo ============================================================
 echo.
 
@@ -56,7 +56,7 @@ echo.
 
 :: Test 4: Check GCS API Connection
 echo [TEST 4] Testing Connection to Google Cloud Storage bucket '%BUCKET_NAME%'...
-"%RCLONE_BIN%" ls %REMOTE_NAME%:%BUCKET_NAME% --gcs-bucket-policy-only
+"%RCLONE_BIN%" ls %REMOTE_NAME%:%BUCKET_NAME% --gcs-bucket-policy-only --log-level NOTICE
 if %errorlevel%==0 (
     echo   [PASS] Successfully connected to GCS bucket '%BUCKET_NAME%'!
 ) else (
@@ -78,7 +78,8 @@ echo.
     --vfs-write-back 1s ^
     --gcs-bucket-policy-only ^
     --links ^
-    --no-modtime
+    --no-modtime ^
+    --log-level NOTICE
 
 echo.
 pause
