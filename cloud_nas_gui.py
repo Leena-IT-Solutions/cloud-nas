@@ -48,6 +48,40 @@ IS_WIN = platform.system() == "Windows"
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 USERS_FILE = os.path.join(SCRIPT_DIR, "users_permissions.json")
 
+def get_rclone_bin():
+    if IS_MAC:
+        candidates = [
+            os.path.join(SCRIPT_DIR, "mac", "rclone"),
+            os.path.join(SCRIPT_DIR, "rclone"),
+        ]
+        for c in candidates:
+            if os.path.exists(c):
+                return c
+        return "rclone"
+    elif IS_WIN:
+        candidates = [
+            os.path.join(SCRIPT_DIR, "windows", "rclone.exe"),
+            os.path.join(SCRIPT_DIR, "rclone.exe"),
+        ]
+        for c in candidates:
+            if os.path.exists(c):
+                return c
+        return "rclone.exe"
+    return "rclone"
+
+def get_mount_script():
+    if IS_MAC:
+        mac_path = os.path.join(SCRIPT_DIR, "mac", "mac-mount.sh")
+        if os.path.exists(mac_path):
+            return mac_path
+        return os.path.join(SCRIPT_DIR, "mac-mount.sh")
+    elif IS_WIN:
+        win_path = os.path.join(SCRIPT_DIR, "windows", "windows-mount-hidden.vbs")
+        if os.path.exists(win_path):
+            return win_path
+        return os.path.join(SCRIPT_DIR, "windows-mount-hidden.vbs")
+    return ""
+
 class DarkButton(tk.Button):
     """Custom flat dark mode button with smooth hover effects for macOS & Windows."""
     def __init__(self, parent, text, command, bg, fg, hover_bg=None, font=("Segoe UI", 9, "bold"), padx=14, pady=6, **kwargs):
@@ -119,9 +153,7 @@ class CloudNASApp:
 
     def load_users_data(self):
         remote_target = "gcsnas:sv-school/.sys/users_permissions.json"
-        rclone_bin = os.path.join(SCRIPT_DIR, "rclone")
-        if not os.path.exists(rclone_bin):
-            rclone_bin = "rclone"
+        rclone_bin = get_rclone_bin()
 
         # 1. Fetch live user database from Google Cloud Storage remote with isolated cache dir
         try:
@@ -206,9 +238,7 @@ class CloudNASApp:
 
         # Sync to GCS Cloud Storage remote object
         def _upload():
-            rclone_bin = os.path.join(SCRIPT_DIR, "rclone")
-            if not os.path.exists(rclone_bin):
-                rclone_bin = "rclone"
+            rclone_bin = get_rclone_bin()
             remote_target = "gcsnas:sv-school/.sys/users_permissions.json"
             try:
                 subprocess.run([rclone_bin, "copyto", USERS_FILE, remote_target, "--cache-dir", "/tmp/rclone_chat_cache"], capture_output=True, timeout=10)
@@ -296,11 +326,10 @@ class CloudNASApp:
             uname = user.get("username", "User")
             
             print(f"Remounting Cloud NAS for user '{uname}' (Folder: '{folder}', Perm: '{perm}')...")
+            mount_script = get_mount_script()
             if IS_MAC:
-                mount_script = os.path.join(SCRIPT_DIR, "mac-mount.sh")
                 subprocess.run(["bash", mount_script], capture_output=True)
             elif IS_WIN:
-                mount_script = os.path.join(SCRIPT_DIR, "windows-mount-hidden.vbs")
                 subprocess.run(["cscript", "//nologo", mount_script], capture_output=True)
             
             if hasattr(self, "log_box"):
@@ -395,11 +424,10 @@ class CloudNASApp:
         
         # Remount root drive on logout
         def _remount_root():
+            mount_script = get_mount_script()
             if IS_MAC:
-                mount_script = os.path.join(SCRIPT_DIR, "mac-mount.sh")
                 subprocess.run(["bash", mount_script], capture_output=True)
             elif IS_WIN:
-                mount_script = os.path.join(SCRIPT_DIR, "windows-mount-hidden.vbs")
                 subprocess.run(["cscript", "//nologo", mount_script], capture_output=True)
 
         threading.Thread(target=_remount_root, daemon=True).start()
@@ -715,9 +743,7 @@ class CloudNASApp:
     def fetch_chat_history(self, user1, user2):
         chat_file = self.get_chat_filename(user1, user2)
         remote_target = f"gcsnas:sv-school/.sys/chats/{chat_file}"
-        rclone_bin = os.path.join(SCRIPT_DIR, "rclone")
-        if not os.path.exists(rclone_bin):
-            rclone_bin = "rclone"
+        rclone_bin = get_rclone_bin()
 
         try:
             res = subprocess.run([rclone_bin, "cat", remote_target, "--cache-dir", "/tmp/rclone_chat_cache"], capture_output=True, text=True, timeout=5)
@@ -760,9 +786,7 @@ class CloudNASApp:
                 with open(tmp_local, "w") as f:
                     json.dump({"messages": history}, f, indent=2)
                 
-                rclone_bin = os.path.join(SCRIPT_DIR, "rclone")
-                if not os.path.exists(rclone_bin):
-                    rclone_bin = "rclone"
+                rclone_bin = get_rclone_bin()
                 
                 subprocess.run([rclone_bin, "copyto", tmp_local, remote_target, "--cache-dir", "/tmp/rclone_chat_cache"], capture_output=True, timeout=8)
                 if os.path.exists(tmp_local):
