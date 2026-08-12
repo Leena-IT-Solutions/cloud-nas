@@ -1296,9 +1296,20 @@ class CloudNASApp:
         self.log("Activity log cleared.")
 
 def main():
-    root = tk.Tk()
-    app = CloudNASApp(root)
-    root.mainloop()
+    try:
+        root = tk.Tk()
+        app = CloudNASApp(root)
+        root.mainloop()
+    except Exception as e:
+        import traceback
+        err_text = traceback.format_exc()
+        try:
+            log_path = os.path.join(SCRIPT_DIR, "cloud_nas_gui_error.log")
+            with open(log_path, "a") as f:
+                f.write(f"[{datetime.now()}] GUI Launch Error:\n{err_text}\n")
+        except Exception:
+            pass
+        raise e
 
 if __name__ == "__main__":
     main()

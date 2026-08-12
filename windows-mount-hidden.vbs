@@ -26,8 +26,8 @@ driveLetter = GetFreeDriveLetter()
 WshShell.Run "taskkill /f /im rclone.exe", 0, True
 WshShell.Run "net use " & driveLetter & " /delete /yes", 0, True
 
-' Configure remote
-WshShell.Run """" & rcloneBin & """ config create gcsnas googlecloudstorage service_account_file """ & keyFile & """ bucket_policy_only true", 0, True
+' Configure remote with proper path quoting
+WshShell.Run """" & rcloneBin & """ config create gcsnas googlecloudstorage service_account_file """" & keyFile & """" bucket_policy_only true", 0, True
 
 remotePath = "gcsnas:sv-school"
 readOnlyFlag = ""
