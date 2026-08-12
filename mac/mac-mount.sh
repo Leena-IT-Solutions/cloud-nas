@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-# macOS Cloud NAS Auto-Mount Script with User Permission & Folder Scoping
+# macOS Cloud NAS Auto-Mount Script with Boot Network Wait Loop & Resilient Retries
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 PROJECT_ROOT="$( cd "$SCRIPT_DIR/.." && pwd )"
 
@@ -44,6 +44,17 @@ fi
 
 MOUNT_POINT="$HOME/$VOL_NAME"
 
+# Wait for active internet connection before mounting (up to 45 seconds on system reboot)
+MAX_WAIT=45
+WAIT_COUNT=0
+while ! ping -c 1 8.8.8.8 >/dev/null 2>&1 && ! ping -c 1 oauth2.googleapis.com >/dev/null 2>&1; do
+    sleep 2
+    WAIT_COUNT=$((WAIT_COUNT + 2))
+    if [ $WAIT_COUNT -ge $MAX_WAIT ]; then
+        break
+    fi
+done
+
 # Unmount existing instance if running
 pkill -9 -f "rclone mount" >/dev/null 2>&1
 diskutil unmount force "$MOUNT_POINT" >/dev/null 2>&1 || true
@@ -62,6 +73,10 @@ nohup "$RCLONE_BIN" mount "$REMOTE_PATH" "$MOUNT_POINT" \
     --vfs-write-back 1s \
     --dir-cache-time 10s \
     --attr-timeout 1s \
+    --contimeout 60s \
+    --timeout 60s \
+    --low-level-retries 10 \
+    --retries 10 \
     --allow-non-empty \
     --gcs-bucket-policy-only \
     --volname "$VOL_NAME" \

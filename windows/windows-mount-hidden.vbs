@@ -24,6 +24,20 @@ End Function
 
 driveLetter = GetFreeDriveLetter()
 
+' Wait for active internet connection before mounting (up to 45 seconds on system reboot)
+On Error Resume Next
+Set objWMIService = GetObject("winmgmts:\\.\root\cimv2")
+For waitCount = 1 To 20
+    Set colItems = objWMIService.ExecQuery("Select * from Win32_PingStatus Where Address = '8.8.8.8'")
+    isOnline = False
+    For Each objItem In colItems
+        If objItem.StatusCode = 0 Then isOnline = True
+    Next
+    If isOnline Then Exit For
+    WScript.Sleep 2000
+Next
+On Error GoTo 0
+
 ' Terminate existing rclone processes & clean drive letter if bound
 WshShell.Run "taskkill /f /im rclone.exe", 0, True
 WshShell.Run "net use " & driveLetter & " /delete /yes", 0, True
@@ -58,7 +72,7 @@ If fso.FileExists(activeUserFile) Then
 End If
 
 ' 1. Primary Attempt: Rclone Mount with Network Mode (Works inside Virtual Machines & physical PCs)
-cmdMount = """" & rcloneBin & """ mount " & remotePath & " " & driveLetter & " --network-mode --vfs-cache-mode full --vfs-cache-max-size 10G --vfs-cache-max-age 24h --vfs-write-back 1s --dir-cache-time 10s --attr-timeout 1s --gcs-bucket-policy-only --rc --rc-no-auth --rc-addr 127.0.0.1:5572 --no-modtime --log-level NOTICE " & readOnlyFlag
+cmdMount = """" & rcloneBin & """ mount " & remotePath & " " & driveLetter & " --network-mode --vfs-cache-mode full --vfs-cache-max-size 10G --vfs-cache-max-age 24h --vfs-write-back 1s --dir-cache-time 10s --attr-timeout 1s --contimeout 60s --timeout 60s --low-level-retries 10 --retries 10 --gcs-bucket-policy-only --rc --rc-no-auth --rc-addr 127.0.0.1:5572 --no-modtime --log-level NOTICE " & readOnlyFlag
 WshShell.Run cmdMount, 0, False
 
 WScript.Sleep 2500
@@ -66,7 +80,7 @@ WScript.Sleep 2500
 ' 2. Fallback Attempt: WebDAV serve + WebClient Net Use if drive letter is not yet active
 If Not fso.DriveExists(driveLetter) Then
     WshShell.Run "taskkill /f /im rclone.exe", 0, True
-    cmdWebdav = """" & rcloneBin & """ serve webdav " & remotePath & " --addr 127.0.0.1:8080 --vfs-cache-mode full --vfs-cache-max-size 10G --vfs-cache-max-age 24h --vfs-write-back 1s --dir-cache-time 10s --attr-timeout 1s --gcs-bucket-policy-only --rc --rc-no-auth --rc-addr 127.0.0.1:5572 --no-modtime --log-level NOTICE " & readOnlyFlag
+    cmdWebdav = """" & rcloneBin & """ serve webdav " & remotePath & " --addr 127.0.0.1:8080 --vfs-cache-mode full --vfs-cache-max-size 10G --vfs-cache-max-age 24h --vfs-write-back 1s --dir-cache-time 10s --attr-timeout 1s --contimeout 60s --timeout 60s --low-level-retries 10 --retries 10 --gcs-bucket-policy-only --rc --rc-no-auth --rc-addr 127.0.0.1:5572 --no-modtime --log-level NOTICE " & readOnlyFlag
     WshShell.Run cmdWebdav, 0, False
     WScript.Sleep 2000
     WshShell.Run "net start WebClient", 0, True
