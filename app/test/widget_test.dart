@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:app/main.dart';
+import 'package:cloud_nas/main.dart';
 
 void main() {
   testWidgets('Cloud NAS app smoke test', (WidgetTester tester) async {
