@@ -9,6 +9,7 @@ BUCKET_NAME="sv-school"
 REMOTE_NAME="gcsnas"
 RCLONE_BIN="$SCRIPT_DIR/rclone"
 GUI_SCRIPT="$PROJECT_ROOT/cloud_nas_gui.py"
+MOUNT_SCRIPT="$SCRIPT_DIR/mac-mount.sh"
 
 # Resolve exact Python 3 binary path
 PYTHON_BIN="$(which python3)"
@@ -75,34 +76,10 @@ echo "[OK] Rclone Binary Ready: $RCLONE_BIN"
 echo "[INFO] Configuring Rclone..."
 "$RCLONE_BIN" config create "$REMOTE_NAME" googlecloudstorage service_account_file "$KEY_FILE" bucket_policy_only true >/dev/null 2>&1
 
-# Prepare Mount Point Directory
+# Prepare Mount Point Directory & Run Mount Script
 echo "[INFO] Mounting Cloud NAS ($VOL_NAME) to $MOUNT_POINT..."
-pkill -9 -f "rclone mount" >/dev/null 2>&1
-diskutil unmount force "$MOUNT_POINT" >/dev/null 2>&1 || true
-umount -f "$MOUNT_POINT" >/dev/null 2>&1 || true
-sleep 1
-
-rm -rf "$MOUNT_POINT" >/dev/null 2>&1 || true
-mkdir -p "$MOUNT_POINT"
-
-# Launch rclone mount in background via nohup
-nohup "$RCLONE_BIN" mount "$REMOTE_PATH" "$MOUNT_POINT" \
-    --vfs-cache-mode full \
-    --vfs-cache-max-size 10G \
-    --vfs-cache-max-age 24h \
-    --vfs-write-back 1s \
-    --dir-cache-time 10s \
-    --attr-timeout 1s \
-    --allow-non-empty \
-    --gcs-bucket-policy-only \
-    --volname "$VOL_NAME" \
-    --rc \
-    --rc-no-auth \
-    --rc-addr 127.0.0.1:5572 \
-    --no-modtime \
-    $READ_ONLY_FLAG >/dev/null 2>&1 &
-
-sleep 1
+chmod +x "$MOUNT_SCRIPT"
+bash "$MOUNT_SCRIPT"
 
 # Create macOS Application Bundle in ~/Applications/Cloud NAS.app for Launchpad & Spotlight
 APP_DIR="$HOME/Applications/Cloud NAS.app"
@@ -142,9 +119,34 @@ EOF
 chmod +x "$APP_DIR/Contents/MacOS/Cloud NAS"
 echo "[OK] Installed 'Cloud NAS' with Python ($PYTHON_BIN) in macOS Applications & Launchpad!"
 
-# Auto-start GUI on macOS login
-PLIST_PATH="$HOME/Library/LaunchAgents/com.cloudnas.controlcenter.plist"
-cat << EOF > "$PLIST_PATH"
+# 1. Auto-mount Cloud NAS drive on macOS login/boot
+LAUNCH_AGENT_DIR="$HOME/Library/LaunchAgents"
+mkdir -p "$LAUNCH_AGENT_DIR"
+
+AUTOMOUNT_PLIST="$LAUNCH_AGENT_DIR/com.cloudnas.automount.plist"
+cat << EOF > "$AUTOMOUNT_PLIST"
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.cloudnas.automount</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>/bin/bash</string>
+        <string>$MOUNT_SCRIPT</string>
+    </array>
+    <key>RunAtLoad</key>
+    <true/>
+</dict>
+</plist>
+EOF
+launchctl unload "$AUTOMOUNT_PLIST" >/dev/null 2>&1 || true
+launchctl load -w "$AUTOMOUNT_PLIST" >/dev/null 2>&1
+
+# 2. Auto-start GUI Control Center on macOS login
+GUI_PLIST="$LAUNCH_AGENT_DIR/com.cloudnas.controlcenter.plist"
+cat << EOF > "$GUI_PLIST"
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
@@ -161,7 +163,8 @@ cat << EOF > "$PLIST_PATH"
 </dict>
 </plist>
 EOF
-launchctl load "$PLIST_PATH" >/dev/null 2>&1
+launchctl unload "$GUI_PLIST" >/dev/null 2>&1 || true
+launchctl load -w "$GUI_PLIST" >/dev/null 2>&1
 
 echo "============================================================"
 echo "[SUCCESS] Cloud NAS mounted ($VOL_NAME) & installed to Applications / Launchpad!"

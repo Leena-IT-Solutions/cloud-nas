@@ -212,6 +212,7 @@ class CloudNASApp:
                     saved_user = json.load(f)
                     if saved_user and "username" in saved_user:
                         self.logged_in_user = saved_user
+                        self.remount_for_active_user(saved_user)
                         self.show_main_app()
                         return
             except Exception as e:

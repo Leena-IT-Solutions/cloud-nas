@@ -19,7 +19,8 @@ fi
 
 MOUNT_POINT="$HOME/$VOL_NAME"
 APP_DIR="$HOME/Applications/Cloud NAS.app"
-PLIST_PATH="$HOME/Library/LaunchAgents/com.cloudnas.controlcenter.plist"
+AUTOMOUNT_PLIST="$HOME/Library/LaunchAgents/com.cloudnas.automount.plist"
+GUI_PLIST="$HOME/Library/LaunchAgents/com.cloudnas.controlcenter.plist"
 
 echo "============================================================"
 echo "      🗑️ macOS 1-Click Cloud NAS Purge & Uninstall 🗑️"
@@ -37,11 +38,15 @@ rm -rf "$MOUNT_POINT" >/dev/null 2>&1 || true
 echo "[INFO] Terminating rclone background processes and Control Center..."
 pkill -9 -f "cloud_nas_gui.py" >/dev/null 2>&1 || true
 
-# Remove LaunchAgent Auto-Start
-if [ -f "$PLIST_PATH" ]; then
-    echo "[INFO] Removing auto-mount LaunchAgent..."
-    launchctl unload "$PLIST_PATH" >/dev/null 2>&1 || true
-    rm -f "$PLIST_PATH" >/dev/null 2>&1 || true
+# Remove LaunchAgent Auto-Start Plists
+echo "[INFO] Removing auto-mount LaunchAgents..."
+if [ -f "$AUTOMOUNT_PLIST" ]; then
+    launchctl unload -w "$AUTOMOUNT_PLIST" >/dev/null 2>&1 || true
+    rm -f "$AUTOMOUNT_PLIST" >/dev/null 2>&1 || true
+fi
+if [ -f "$GUI_PLIST" ]; then
+    launchctl unload -w "$GUI_PLIST" >/dev/null 2>&1 || true
+    rm -f "$GUI_PLIST" >/dev/null 2>&1 || true
 fi
 
 # Remove macOS Application Bundle
@@ -58,8 +63,8 @@ fi
 
 # Remove Local Configuration Files
 rm -rf "$HOME/.config/rclone" >/dev/null 2>&1 || true
-rm -rf /tmp/rclone_chat_cache >/dev/null 2>&1 || true
-rm -f "$CONFIG_FILE" "$USERS_FILE" "$ACTIVE_USER_FILE" >/dev/null 2>&1 || true
+rm -f "$ACTIVE_USER_FILE" >/dev/null 2>&1 || true
+rm -f "$CONFIG_FILE" >/dev/null 2>&1 || true
 
 echo "============================================================"
 echo "[SUCCESS] Cloud NAS has been completely purged from this Mac!"
