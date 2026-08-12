@@ -431,6 +431,14 @@ class CloudNASApp:
             except Exception:
                 pass
         
+        # Reset session state and remove lingering admin tab references
+        self.logged_in_user = None
+        self.active_chat_recipient = None
+        self.active_tab = "dashboard"
+        self.unread_counts = {}
+        if hasattr(self, "btn_tab_users"):
+            delattr(self, "btn_tab_users")
+
         # Remount root drive on logout
         def _remount_root():
             mount_script = get_mount_script()
@@ -440,11 +448,12 @@ class CloudNASApp:
                 subprocess.run(["cscript", "//nologo", mount_script], capture_output=True)
 
         threading.Thread(target=_remount_root, daemon=True).start()
-
-        self.logged_in_user = None
         self.show_login_screen()
 
     def create_tab_bar(self):
+        if hasattr(self, "btn_tab_users"):
+            delattr(self, "btn_tab_users")
+
         tab_frame = tk.Frame(self.root, bg="#181825", padx=15, pady=0)
         tab_frame.pack(fill="x", pady=(0, 5))
 
@@ -475,7 +484,7 @@ class CloudNASApp:
     def update_chat_tab_badge(self):
         total_unread = sum(self.unread_counts.values())
         chat_title = f"💬 Live Chat ({total_unread})" if total_unread > 0 else "💬 Live Chat"
-        if hasattr(self, "btn_tab_chat") and self.btn_tab_chat.winfo_exists():
+        if hasattr(self, "btn_tab_chat") and self.btn_tab_chat and self.btn_tab_chat.winfo_exists():
             if self.active_tab == "chat":
                 self.btn_tab_chat.config(text=chat_title, bg="#a6e3a1", fg="#11111b")
             else:
@@ -492,27 +501,30 @@ class CloudNASApp:
 
     def switch_to_dashboard(self):
         self.active_tab = "dashboard"
-        self.btn_tab_dashboard.config(bg="#89b4fa", fg="#11111b")
+        if hasattr(self, "btn_tab_dashboard") and self.btn_tab_dashboard and self.btn_tab_dashboard.winfo_exists():
+            self.btn_tab_dashboard.config(bg="#89b4fa", fg="#11111b")
         self.update_chat_tab_badge()
-        if hasattr(self, "btn_tab_users"):
+        if hasattr(self, "btn_tab_users") and self.btn_tab_users and self.btn_tab_users.winfo_exists():
             self.btn_tab_users.config(bg="#313244", fg="#cdd6f4")
         self.clear_content_frame()
         self.render_dashboard_tab()
 
     def switch_to_chat(self):
         self.active_tab = "chat"
-        self.btn_tab_dashboard.config(bg="#313244", fg="#cdd6f4")
+        if hasattr(self, "btn_tab_dashboard") and self.btn_tab_dashboard and self.btn_tab_dashboard.winfo_exists():
+            self.btn_tab_dashboard.config(bg="#313244", fg="#cdd6f4")
         self.update_chat_tab_badge()
-        if hasattr(self, "btn_tab_users"):
+        if hasattr(self, "btn_tab_users") and self.btn_tab_users and self.btn_tab_users.winfo_exists():
             self.btn_tab_users.config(bg="#313244", fg="#cdd6f4")
         self.clear_content_frame()
         self.render_chat_tab()
 
     def switch_to_users(self):
         self.active_tab = "users"
-        if hasattr(self, "btn_tab_users"):
+        if hasattr(self, "btn_tab_users") and self.btn_tab_users and self.btn_tab_users.winfo_exists():
             self.btn_tab_users.config(bg="#cba6f7", fg="#11111b")
-        self.btn_tab_dashboard.config(bg="#313244", fg="#cdd6f4")
+        if hasattr(self, "btn_tab_dashboard") and self.btn_tab_dashboard and self.btn_tab_dashboard.winfo_exists():
+            self.btn_tab_dashboard.config(bg="#313244", fg="#cdd6f4")
         self.update_chat_tab_badge()
         self.clear_content_frame()
         self.render_users_tab()
