@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-# macOS Cloud NAS Auto-Mount Script with Finder Computer Disk Registration
+# macOS Cloud NAS Auto-Mount Script
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 PROJECT_ROOT="$( cd "$SCRIPT_DIR/.." && pwd )"
 
@@ -72,7 +72,6 @@ nohup "$RCLONE_BIN" mount "$REMOTE_PATH" "$MOUNT_POINT" \
     --vfs-cache-max-age 72h \
     --vfs-write-back 1s \
     --dir-cache-time 9999h \
-    --poll-interval 10s \
     --vfs-read-chunk-size 64M \
     --vfs-read-chunk-size-limit 1G \
     --vfs-fast-fingerprint \
@@ -84,7 +83,6 @@ nohup "$RCLONE_BIN" mount "$REMOTE_PATH" "$MOUNT_POINT" \
     --allow-non-empty \
     --gcs-bucket-policy-only \
     --volname "$VOL_NAME" \
-    -o volume_name="$VOL_NAME" \
     --rc \
     --rc-no-auth \
     --rc-addr 127.0.0.1:5572 \
@@ -93,4 +91,4 @@ nohup "$RCLONE_BIN" mount "$REMOTE_PATH" "$MOUNT_POINT" \
 
 disown %1 >/dev/null 2>&1 || true
 
-echo "Cloud NAS mounted successfully as '$VOL_NAME'!"
+echo "Cloud NAS mounted successfully at '$MOUNT_POINT'!"
