@@ -64,7 +64,7 @@ sleep 1
 rm -rf "$MOUNT_POINT" >/dev/null 2>&1 || true
 mkdir -p "$MOUNT_POINT"
 
-echo "Mounting Cloud NAS ($VOL_NAME) to '$MOUNT_POINT' with Enterprise Smart Pointer Caching..."
+echo "Mounting Cloud NAS ($VOL_NAME) to '$MOUNT_POINT'..."
 
 nohup "$RCLONE_BIN" mount "$REMOTE_PATH" "$MOUNT_POINT" \
     --vfs-cache-mode full \
@@ -84,6 +84,7 @@ nohup "$RCLONE_BIN" mount "$REMOTE_PATH" "$MOUNT_POINT" \
     --allow-non-empty \
     --gcs-bucket-policy-only \
     --volname "$VOL_NAME" \
+    -o nobrowse \
     --rc \
     --rc-no-auth \
     --rc-addr 127.0.0.1:5572 \
