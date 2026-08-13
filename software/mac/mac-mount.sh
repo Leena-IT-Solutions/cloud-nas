@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-# macOS Cloud NAS Auto-Mount Script
+# macOS Cloud NAS Auto-Mount Script (Native Launchd Persistent Process)
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 PROJECT_ROOT="$( cd "$SCRIPT_DIR/.." && pwd )"
 
@@ -64,9 +64,9 @@ sleep 1
 rm -rf "$MOUNT_POINT" >/dev/null 2>&1 || true
 mkdir -p "$MOUNT_POINT"
 
-echo "Mounting Cloud NAS ($VOL_NAME) to '$MOUNT_POINT'..."
+echo "Mounting Cloud NAS ($VOL_NAME) to '$MOUNT_POINT' as Launchd System Daemon..."
 
-nohup "$RCLONE_BIN" mount "$REMOTE_PATH" "$MOUNT_POINT" \
+exec "$RCLONE_BIN" mount "$REMOTE_PATH" "$MOUNT_POINT" \
     --vfs-cache-mode full \
     --vfs-cache-max-size 25G \
     --vfs-cache-max-age 72h \
@@ -87,8 +87,4 @@ nohup "$RCLONE_BIN" mount "$REMOTE_PATH" "$MOUNT_POINT" \
     --rc-no-auth \
     --rc-addr 127.0.0.1:5572 \
     --no-modtime \
-    $READ_ONLY_FLAG >/dev/null 2>&1 &
-
-disown %1 >/dev/null 2>&1 || true
-
-echo "Cloud NAS mounted successfully at '$MOUNT_POINT'!"
+    $READ_ONLY_FLAG

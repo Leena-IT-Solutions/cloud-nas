@@ -120,13 +120,14 @@ def setup_autostart_mac(mount_script_path):
     <key>RunAtLoad</key>
     <true/>
     <key>KeepAlive</key>
-    <false/>
+    <true/>
 </dict>
 </plist>
 '''
     try:
         with open(plist_path, "w") as f:
             f.write(plist_content)
+        subprocess.run(["launchctl", "unload", plist_path], capture_output=True)
         subprocess.run(["launchctl", "load", "-w", plist_path], capture_output=True)
     except Exception as e:
         print(f"Failed to set up macOS autostart: {e}")
