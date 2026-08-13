@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-# macOS Cloud NAS Auto-Mount Script with Boot Network Wait Loop & Resilient Retries
+# macOS Cloud NAS Auto-Mount Script with Detached Session & Resilient Retries
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 PROJECT_ROOT="$( cd "$SCRIPT_DIR/.." && pwd )"
 
@@ -85,5 +85,7 @@ nohup "$RCLONE_BIN" mount "$REMOTE_PATH" "$MOUNT_POINT" \
     --rc-addr 127.0.0.1:5572 \
     --no-modtime \
     $READ_ONLY_FLAG >/dev/null 2>&1 &
+
+disown %1 >/dev/null 2>&1 || true
 
 echo "Cloud NAS mounted successfully at '$MOUNT_POINT'!"

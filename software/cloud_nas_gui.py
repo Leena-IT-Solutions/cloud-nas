@@ -60,6 +60,8 @@ def run_hidden_subprocess(cmd_args, **kwargs):
 def popen_hidden_subprocess(cmd_args, **kwargs):
     if IS_WIN:
         kwargs["creationflags"] = kwargs.get("creationflags", 0) | CREATE_NO_WINDOW
+    else:
+        kwargs["start_new_session"] = True
     return subprocess.Popen(cmd_args, **kwargs)
 
 def get_rclone_bin():
@@ -431,10 +433,10 @@ class CloudNASApp:
             print(f"Remounting Cloud NAS for user '{uname}' (Folder: '{folder}', Perm: '{perm}')...")
             mount_script = get_mount_script()
             if IS_MAC:
-                run_hidden_subprocess(["bash", mount_script], capture_output=True)
+                popen_hidden_subprocess(["bash", mount_script], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
                 setup_autostart_mac(mount_script)
             elif IS_WIN:
-                run_hidden_subprocess(["cscript", "//nologo", mount_script], capture_output=True)
+                popen_hidden_subprocess(["cscript", "//nologo", mount_script], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
                 setup_autostart_windows(mount_script)
             
             if hasattr(self, "log_box"):
@@ -539,9 +541,9 @@ class CloudNASApp:
         def _remount_root():
             mount_script = get_mount_script()
             if IS_MAC:
-                run_hidden_subprocess(["bash", mount_script], capture_output=True)
+                popen_hidden_subprocess(["bash", mount_script], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
             elif IS_WIN:
-                run_hidden_subprocess(["cscript", "//nologo", mount_script], capture_output=True)
+                popen_hidden_subprocess(["cscript", "//nologo", mount_script], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
         threading.Thread(target=_remount_root, daemon=True).start()
         self.show_login_screen()
