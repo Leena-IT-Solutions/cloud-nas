@@ -2,7 +2,7 @@
 setlocal enabledelayedexpansion
 
 echo ============================================================
-echo      🗑️ Windows 1-Click Cloud NAS Purge & Uninstall 🗑️
+echo      🗑️ Windows 1-Click Cloud NAS Purge ^& Uninstall 🗑️
 echo ============================================================
 
 set "SCRIPT_DIR=%~dp0"

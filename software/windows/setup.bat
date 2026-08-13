@@ -54,14 +54,17 @@ rem 3. Check / Install WinFsp Driver for Native High-Speed Disk Drive Mounting
 sc query winfsp >nul 2>&1
 if errorlevel 1 (
     echo [INFO] Installing WinFsp Native Drive Driver for Windows...
-    powershell -Command "$ProgressPreference = 'SilentlyContinue'; Invoke-WebRequest -Uri 'https://github.com/winfsp/winfsp/releases/download/v2.0/winfsp-2.0.23075.msi' -OutFile '%TEMP%\winfsp.msi'"
-    msiexec /i "%TEMP%\winfsp.msi" /qn /norestart >nul 2>&1
-    del /F /Q "%TEMP%\winfsp.msi" >nul 2>&1
+    winget install --id WinFsp.WinFsp -e --source winget --accept-source-agreements --accept-package-agreements >nul 2>&1
+    if errorlevel 1 (
+        powershell -Command "$ProgressPreference = 'SilentlyContinue'; Invoke-WebRequest -Uri 'https://github.com/winfsp/winfsp/releases/download/v2.1/winfsp-2.1.25156.msi' -OutFile '%TEMP%\winfsp.msi'"
+        msiexec /i "%TEMP%\winfsp.msi" /qn /norestart >nul 2>&1
+        del /F /Q "%TEMP%\winfsp.msi" >nul 2>&1
+    )
 )
 echo [OK] WinFsp Native Drive Driver Ready!
 
 rem 4. Start Windows WebClient Service & Configure Registry (WebDAV Fallback)
-echo [INFO] Enabling Windows WebClient Service & Registry Settings...
+echo [INFO] Enabling Windows WebClient Service ^& Registry Settings...
 reg add HKLM\SYSTEM\CurrentControlSet\Services\WebClient\Parameters /v BasicAuthLevel /t REG_DWORD /d 2 /f >nul 2>&1
 sc config WebClient start= auto >nul 2>&1
 net start WebClient >nul 2>&1
@@ -84,7 +87,7 @@ cscript //nologo "%SHORTCUT_VBS%" >nul 2>&1
 del /F /Q "%SHORTCUT_VBS%"
 
 echo ============================================================
-echo [SUCCESS] Cloud NAS mounted & installed to Windows Startup!
+echo [SUCCESS] Cloud NAS mounted ^& installed to Windows Startup!
 echo ============================================================
 
 start "" "%PYTHON_EXE%" "%GUI_SCRIPT%"

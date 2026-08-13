@@ -32,8 +32,10 @@ try:
     single_instance_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
     single_instance_socket.bind(('127.0.0.1', 5573))
 except socket.error:
-    # Terminate stale background process to ensure fresh GUI window opens
-    subprocess.run(["pkill", "-9", "-f", "cloud_nas_gui.py"], capture_output=True)
+    if IS_WIN:
+        run_hidden_subprocess(["taskkill", "/f", "/im", "pythonw.exe"], capture_output=True)
+    else:
+        run_hidden_subprocess(["pkill", "-9", "-f", "cloud_nas_gui.py"], capture_output=True)
     time.sleep(0.5)
     try:
         single_instance_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -47,6 +49,18 @@ IS_MAC = platform.system() == "Darwin"
 IS_WIN = platform.system() == "Windows"
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 USERS_FILE = os.path.join(SCRIPT_DIR, "users_permissions.json")
+
+CREATE_NO_WINDOW = 0x08000000 if IS_WIN else 0
+
+def run_hidden_subprocess(cmd_args, **kwargs):
+    if IS_WIN:
+        kwargs["creationflags"] = kwargs.get("creationflags", 0) | CREATE_NO_WINDOW
+    return subprocess.run(cmd_args, **kwargs)
+
+def popen_hidden_subprocess(cmd_args, **kwargs):
+    if IS_WIN:
+        kwargs["creationflags"] = kwargs.get("creationflags", 0) | CREATE_NO_WINDOW
+    return subprocess.Popen(cmd_args, **kwargs)
 
 def get_rclone_bin():
     if IS_MAC:
@@ -225,9 +239,28 @@ class CloudNASApp:
         remote_target = "gcsnas:sv-school/.sys/users_permissions.json"
         rclone_bin = get_rclone_bin()
 
-        # 1. Fetch live user database from Google Cloud Storage remote with isolated cache dir
+        # 1. Try reading directly from mounted drive first (instant & silent)
+        mounted_users_path = None
+        if IS_WIN and os.path.exists("Z:\\.sys\\users_permissions.json"):
+            mounted_users_path = "Z:\\.sys\\users_permissions.json"
+        elif IS_MAC and os.path.exists(os.path.expanduser("~/Cloud NAS/.sys/users_permissions.json")):
+            mounted_users_path = os.path.expanduser("~/Cloud NAS/.sys/users_permissions.json")
+
+        if mounted_users_path and os.path.exists(mounted_users_path):
+            try:
+                with open(mounted_users_path, "r", encoding="utf-8") as f:
+                    data = json.load(f)
+                    if "users" in data and len(data["users"]) > 0:
+                        self.users_data = data
+                        with open(USERS_FILE, "w") as f:
+                            json.dump(data, f, indent=2)
+                        return
+            except Exception:
+                pass
+
+        # 2. Fetch live user database from Google Cloud Storage remote with hidden window
         try:
-            res = subprocess.run([rclone_bin, "cat", remote_target, "--cache-dir", get_chat_cache_dir()], capture_output=True, text=True, timeout=5)
+            res = run_hidden_subprocess([rclone_bin, "cat", remote_target, "--cache-dir", get_chat_cache_dir()], capture_output=True, text=True, timeout=5)
             if res.returncode == 0 and res.stdout.strip():
                 data = json.loads(res.stdout)
                 if "users" in data and len(data["users"]) > 0:
@@ -311,7 +344,7 @@ class CloudNASApp:
             rclone_bin = get_rclone_bin()
             remote_target = "gcsnas:sv-school/.sys/users_permissions.json"
             try:
-                subprocess.run([rclone_bin, "copyto", USERS_FILE, remote_target, "--cache-dir", get_chat_cache_dir()], capture_output=True, timeout=10)
+                run_hidden_subprocess([rclone_bin, "copyto", USERS_FILE, remote_target, "--cache-dir", get_chat_cache_dir()], capture_output=True, timeout=10)
                 print(f"✅ User permissions database synced to GCS Cloud Storage remote: {remote_target}")
             except Exception as e:
                 print(f"Failed to sync users database to GCS: {e}")
@@ -398,10 +431,10 @@ class CloudNASApp:
             print(f"Remounting Cloud NAS for user '{uname}' (Folder: '{folder}', Perm: '{perm}')...")
             mount_script = get_mount_script()
             if IS_MAC:
-                subprocess.run(["bash", mount_script], capture_output=True)
+                run_hidden_subprocess(["bash", mount_script], capture_output=True)
                 setup_autostart_mac(mount_script)
             elif IS_WIN:
-                subprocess.run(["cscript", "//nologo", mount_script], capture_output=True)
+                run_hidden_subprocess(["cscript", "//nologo", mount_script], capture_output=True)
                 setup_autostart_windows(mount_script)
             
             if hasattr(self, "log_box"):
@@ -506,9 +539,9 @@ class CloudNASApp:
         def _remount_root():
             mount_script = get_mount_script()
             if IS_MAC:
-                subprocess.run(["bash", mount_script], capture_output=True)
+                run_hidden_subprocess(["bash", mount_script], capture_output=True)
             elif IS_WIN:
-                subprocess.run(["cscript", "//nologo", mount_script], capture_output=True)
+                run_hidden_subprocess(["cscript", "//nologo", mount_script], capture_output=True)
 
         threading.Thread(target=_remount_root, daemon=True).start()
         self.show_login_screen()
@@ -798,7 +831,7 @@ class CloudNASApp:
         def _start_webdav():
             rclone_bin = get_rclone_bin()
             try:
-                self.webdav_proc = subprocess.Popen([rclone_bin, "serve", "webdav", "gcsnas:sv-school", "--addr", ":8080"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                self.webdav_proc = popen_hidden_subprocess([rclone_bin, "serve", "webdav", "gcsnas:sv-school", "--addr", ":8080"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
                 self.log("🌐 Started Android WebDAV Server on port 8080 (http://0.0.0.0:8080)")
             except Exception as e:
                 self.log(f"❌ Failed to start WebDAV Server: {e}")
@@ -859,11 +892,30 @@ class CloudNASApp:
 
     def fetch_chat_history(self, user1, user2):
         chat_file = self.get_chat_filename(user1, user2)
+
+        # 1. Try reading directly from local filesystem / mounted volume first (silent & fast)
+        mounted_chat_path = None
+        if IS_WIN and os.path.exists("Z:\\.sys\\chats"):
+            mounted_chat_path = os.path.join("Z:\\.sys\\chats", chat_file)
+        elif IS_MAC:
+            mac_mount = os.path.expanduser("~/Cloud NAS/.sys/chats")
+            if os.path.exists(mac_mount):
+                mounted_chat_path = os.path.join(mac_mount, chat_file)
+
+        if mounted_chat_path and os.path.exists(mounted_chat_path):
+            try:
+                with open(mounted_chat_path, "r", encoding="utf-8") as f:
+                    data = json.load(f)
+                    return data.get("messages", [])
+            except Exception:
+                pass
+
+        # 2. Remote fallback with hidden subprocess window
         remote_target = f"gcsnas:sv-school/.sys/chats/{chat_file}"
         rclone_bin = get_rclone_bin()
 
         try:
-            res = subprocess.run([rclone_bin, "cat", remote_target, "--cache-dir", get_chat_cache_dir()], capture_output=True, text=True, timeout=5)
+            res = run_hidden_subprocess([rclone_bin, "cat", remote_target, "--cache-dir", get_chat_cache_dir()], capture_output=True, text=True, timeout=5)
             if res.returncode == 0 and res.stdout.strip():
                 data = json.loads(res.stdout)
                 return data.get("messages", [])
@@ -905,7 +957,7 @@ class CloudNASApp:
                 
                 rclone_bin = get_rclone_bin()
                 
-                subprocess.run([rclone_bin, "copyto", tmp_local, remote_target, "--cache-dir", get_chat_cache_dir()], capture_output=True, timeout=8)
+                run_hidden_subprocess([rclone_bin, "copyto", tmp_local, remote_target, "--cache-dir", get_chat_cache_dir()], capture_output=True, timeout=8)
                 if os.path.exists(tmp_local):
                     os.remove(tmp_local)
             except Exception as e:
@@ -921,7 +973,7 @@ class CloudNASApp:
             
             if IS_MAC:
                 cmd = f'display notification "{clean_msg}" with title "{clean_title}" sound name "default"'
-                subprocess.run(["osascript", "-e", cmd], capture_output=True)
+                run_hidden_subprocess(["osascript", "-e", cmd], capture_output=True)
             elif IS_WIN:
                 ps_cmd = (
                     f'[void] [System.Reflection.Assembly]::LoadWithPartialName("System.Windows.Forms"); '
@@ -930,7 +982,7 @@ class CloudNASApp:
                     f'$n.Visible = $true; '
                     f'$n.ShowBalloonTip(5000, "{clean_title}", "{clean_msg}", [System.Windows.Forms.ToolTipIcon]::Info);'
                 )
-                subprocess.run(["powershell", "-Command", ps_cmd], capture_output=True)
+                run_hidden_subprocess(["powershell", "-Command", ps_cmd], capture_output=True)
         except Exception:
             pass
 
@@ -1353,11 +1405,13 @@ class CloudNASApp:
         return None
 
     def poll_stats_loop(self):
+        unmount_count = 0
         while self.is_monitoring:
             try:
                 stats = self.api_post("core/stats")
                 if stats:
                     self.mounted = True
+                    unmount_count = 0
                     try:
                         if hasattr(self, "status_badge") and self.status_badge.winfo_exists():
                             self.root.after(0, self.update_ui_stats, stats)
@@ -1365,11 +1419,21 @@ class CloudNASApp:
                         pass
                 else:
                     self.mounted = False
+                    unmount_count += 1
                     try:
                         if hasattr(self, "status_badge") and self.status_badge.winfo_exists():
                             self.root.after(0, self.update_ui_disconnected)
                     except Exception:
                         pass
+
+                    # Auto-recover / Auto-remount silently if drive unmounts or rclone process is killed
+                    if unmount_count >= 5:
+                        unmount_count = 0
+                        mount_script = get_mount_script()
+                        if IS_WIN and os.path.exists(mount_script):
+                            run_hidden_subprocess(["cscript", "//nologo", mount_script], capture_output=True)
+                        elif IS_MAC and os.path.exists(mount_script):
+                            run_hidden_subprocess(["bash", mount_script], capture_output=True)
             except Exception:
                 pass
             time.sleep(1)
@@ -1430,10 +1494,10 @@ class CloudNASApp:
             self.log("Unmounting current volume & re-applying volume name...")
             if IS_MAC:
                 mount_script = os.path.join(SCRIPT_DIR, "mac-mount.sh")
-                subprocess.run(["bash", mount_script], capture_output=True)
+                run_hidden_subprocess(["bash", mount_script], capture_output=True)
             elif IS_WIN:
                 mount_script = os.path.join(SCRIPT_DIR, "windows-mount-hidden.vbs")
-                subprocess.run(["cscript", "//nologo", mount_script], capture_output=True)
+                run_hidden_subprocess(["cscript", "//nologo", mount_script], capture_output=True)
             self.log(f"✅ Drive successfully renamed to '{new_name}' and remounted!")
 
         threading.Thread(target=_remount, daemon=True).start()
