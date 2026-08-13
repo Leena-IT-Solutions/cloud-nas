@@ -73,18 +73,29 @@ rem 5. Mount Cloud NAS Network Drive
 echo [INFO] Mounting Cloud NAS Network Drive...
 cscript //nologo "%MOUNT_VBS%"
 
-rem 6. Add Windows Startup Shortcut for GUI
+rem 6. Add Windows Start Menu, Desktop & Startup Shortcuts for GUI
+set "STARTMENU_FOLDER=%APPDATA%\Microsoft\Windows\Start Menu\Programs"
 set "STARTUP_FOLDER=%APPDATA%\Microsoft\Windows\Start Menu\Programs\Startup"
+set "DESKTOP_FOLDER=%USERPROFILE%\Desktop"
 set "SHORTCUT_VBS=%TEMP%\create_shortcut.vbs"
+
 echo Set oWS = WScript.CreateObject("WScript.Shell") > "%SHORTCUT_VBS%"
-echo sLinkFile = "%STARTUP_FOLDER%\Cloud NAS Control Center.lnk" >> "%SHORTCUT_VBS%"
-echo Set oLink = oWS.CreateShortcut(sLinkFile) >> "%SHORTCUT_VBS%"
-echo oLink.TargetPath = "%PYTHON_EXE%" >> "%SHORTCUT_VBS%"
-echo oLink.Arguments = """%GUI_SCRIPT%""" >> "%SHORTCUT_VBS%"
-echo oLink.WorkingDirectory = "%PROJECT_ROOT%" >> "%SHORTCUT_VBS%"
-echo oLink.Save >> "%SHORTCUT_VBS%"
+
+echo Sub MakeShortcut(path) >> "%SHORTCUT_VBS%"
+echo   Set oLink = oWS.CreateShortcut(path) >> "%SHORTCUT_VBS%"
+echo   oLink.TargetPath = "%PYTHON_EXE%" >> "%SHORTCUT_VBS%"
+echo   oLink.Arguments = """%GUI_SCRIPT%""" >> "%SHORTCUT_VBS%"
+echo   oLink.WorkingDirectory = "%PROJECT_ROOT%" >> "%SHORTCUT_VBS%"
+echo   oLink.Description = "Cloud NAS Control Center" >> "%SHORTCUT_VBS%"
+echo   oLink.Save >> "%SHORTCUT_VBS%"
+echo End Sub >> "%SHORTCUT_VBS%"
+
+echo MakeShortcut "%STARTMENU_FOLDER%\Cloud NAS Control Center.lnk" >> "%SHORTCUT_VBS%"
+echo MakeShortcut "%STARTUP_FOLDER%\Cloud NAS Control Center.lnk" >> "%SHORTCUT_VBS%"
+if exist "%DESKTOP_FOLDER%" echo MakeShortcut "%DESKTOP_FOLDER%\Cloud NAS Control Center.lnk" >> "%SHORTCUT_VBS%"
+
 cscript //nologo "%SHORTCUT_VBS%" >nul 2>&1
-del /F /Q "%SHORTCUT_VBS%"
+del /F /Q "%SHORTCUT_VBS%" >nul 2>&1
 
 echo ============================================================
 echo [SUCCESS] Cloud NAS mounted ^& installed to Windows Startup!
