@@ -442,6 +442,16 @@ class CloudNASApp:
             if hasattr(self, "log_box"):
                 self.log(f"🔐 Logged in as '{uname}'. Folder scope: '{folder}' ({perm}). Drive remounted!")
 
+            # Trigger silent background VFS directory structure pre-warming
+            def _preload_cache():
+                time.sleep(2.5)
+                rclone_bin = get_rclone_bin()
+                try:
+                    run_hidden_subprocess([rclone_bin, "rc", "vfs/refresh", "recursive=true", "--rc-addr", "127.0.0.1:5572"], capture_output=True, timeout=10)
+                except Exception:
+                    pass
+            threading.Thread(target=_preload_cache, daemon=True).start()
+
         threading.Thread(target=_remount, daemon=True).start()
 
     # ==========================================

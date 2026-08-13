@@ -1,7 +1,8 @@
+#!/usr/bin/env bash
 #!/usr/bin/env python3
 """
 Cloud NAS Automated 1-Click Installer & Configurator
-Supports macOS & Windows out of the box with Persistent Boot Auto-Mounting.
+Supports macOS & Windows out of the box with Enterprise Smart Pointer Caching.
 """
 
 import os
@@ -151,7 +152,7 @@ def setup_autostart_windows(vbs_file):
 
 def mount_drive_mac(rclone_bin, bucket_name):
     """Mount GCS drive on macOS Finder."""
-    log("Setting up Cloud NAS on macOS Finder...")
+    log("Setting up Cloud NAS on macOS Finder with Enterprise Smart Pointer Caching...")
     mount_point = Path.home() / "CloudNAS"
     mount_point.mkdir(parents=True, exist_ok=True)
 
@@ -159,14 +160,19 @@ def mount_drive_mac(rclone_bin, bucket_name):
     run_cmd(f'diskutil unmount force "{mount_point}"', check=False)
     run_cmd(f'umount -f "{mount_point}"', check=False)
 
-    mac_script = SCRIPT_DIR / "mac-mount.sh"
+    mac_script = SCRIPT_DIR / "mac" / "mac-mount.sh"
+    if not mac_script.exists():
+        mac_script = SCRIPT_DIR / "mac-mount.sh"
+
     script_content = f'''#!/bin/bash
 diskutil unmount force "{mount_point}" >/dev/null 2>&1
 umount -f "{mount_point}" >/dev/null 2>&1
 "{rclone_bin}" mount {DEFAULT_REMOTE}:{bucket_name} "{mount_point}" \\
-  --vfs-cache-mode full --vfs-cache-max-size 10G --vfs-cache-max-age 24h \\
-  --vfs-write-back 1s --allow-non-empty --gcs-bucket-policy-only \\
-  --volname "Cloud NAS" --no-modtime --daemon
+  --vfs-cache-mode full --vfs-cache-max-size 25G --vfs-cache-max-age 72h \\
+  --vfs-write-back 1s --dir-cache-time 9999h --poll-interval 10s \\
+  --vfs-read-chunk-size 64M --vfs-read-chunk-size-limit 1G --vfs-fast-fingerprint \\
+  --attr-timeout 9999h --allow-non-empty --gcs-bucket-policy-only \\
+  --volname "Cloud NAS" --no-modtime
 '''
     with open(mac_script, "w") as f:
         f.write(script_content)
@@ -185,7 +191,7 @@ def mount_drive_windows(rclone_bin, bucket_name):
     
     # Create hidden VBS launcher
     vbs_content = f'''Set WshShell = CreateObject("WScript.Shell")
-rcloneCmd = """{rclone_bin}"" mount {DEFAULT_REMOTE}:{bucket_name} Y: --vfs-cache-mode full --vfs-cache-max-size 10G --vfs-cache-max-age 24h --vfs-write-back 1s --gcs-bucket-policy-only --no-modtime"
+rcloneCmd = """{rclone_bin}"" mount {DEFAULT_REMOTE}:{bucket_name} Y: --network-mode --vfs-cache-mode full --vfs-cache-max-size 25G --vfs-cache-max-age 72h --vfs-write-back 1s --dir-cache-time 9999h --poll-interval 10s --vfs-read-chunk-size 64M --vfs-read-chunk-size-limit 1G --vfs-fast-fingerprint --attr-timeout 9999h --gcs-bucket-policy-only --no-modtime"
 WshShell.Run rcloneCmd, 0, False
 '''
     vbs_file = SCRIPT_DIR / "windows-mount-hidden.vbs"

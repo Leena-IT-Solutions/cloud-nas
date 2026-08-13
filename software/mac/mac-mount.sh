@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-# macOS Cloud NAS Auto-Mount Script with Detached Session & Resilient Retries
+# macOS Cloud NAS Auto-Mount Script with Persistent Local Pointer Index & Smart Chunk Streaming
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 PROJECT_ROOT="$( cd "$SCRIPT_DIR/.." && pwd )"
 
@@ -64,15 +64,19 @@ sleep 1
 rm -rf "$MOUNT_POINT" >/dev/null 2>&1 || true
 mkdir -p "$MOUNT_POINT"
 
-echo "Mounting Cloud NAS ($VOL_NAME) to '$MOUNT_POINT'..."
+echo "Mounting Cloud NAS ($VOL_NAME) to '$MOUNT_POINT' with Enterprise Smart Pointer Caching..."
 
 nohup "$RCLONE_BIN" mount "$REMOTE_PATH" "$MOUNT_POINT" \
     --vfs-cache-mode full \
-    --vfs-cache-max-size 10G \
-    --vfs-cache-max-age 24h \
+    --vfs-cache-max-size 25G \
+    --vfs-cache-max-age 72h \
     --vfs-write-back 1s \
-    --dir-cache-time 10s \
-    --attr-timeout 1s \
+    --dir-cache-time 9999h \
+    --poll-interval 10s \
+    --vfs-read-chunk-size 64M \
+    --vfs-read-chunk-size-limit 1G \
+    --vfs-fast-fingerprint \
+    --attr-timeout 9999h \
     --contimeout 60s \
     --timeout 60s \
     --low-level-retries 10 \
