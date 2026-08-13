@@ -660,6 +660,10 @@ class CloudNASApp:
 
     def get_mount_path(self):
         vol_name = self.get_current_drive_name()
+        if IS_MAC:
+            v_path = os.path.join("/Volumes", vol_name)
+            if os.path.exists(v_path):
+                return v_path
         return os.path.join(os.path.expanduser("~"), vol_name)
 
     def scan_mount_files(self, path):

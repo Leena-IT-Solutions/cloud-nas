@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-# macOS Cloud NAS Auto-Mount Script with Persistent Local Pointer Index & Smart Chunk Streaming
+# macOS Cloud NAS Auto-Mount Script with Finder Computer Disk Registration
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 PROJECT_ROOT="$( cd "$SCRIPT_DIR/.." && pwd )"
 
@@ -84,7 +84,7 @@ nohup "$RCLONE_BIN" mount "$REMOTE_PATH" "$MOUNT_POINT" \
     --allow-non-empty \
     --gcs-bucket-policy-only \
     --volname "$VOL_NAME" \
-    -o nobrowse \
+    -o volume_name="$VOL_NAME" \
     --rc \
     --rc-no-auth \
     --rc-addr 127.0.0.1:5572 \
@@ -93,4 +93,4 @@ nohup "$RCLONE_BIN" mount "$REMOTE_PATH" "$MOUNT_POINT" \
 
 disown %1 >/dev/null 2>&1 || true
 
-echo "Cloud NAS mounted successfully at '$MOUNT_POINT'!"
+echo "Cloud NAS mounted successfully as '$VOL_NAME'!"
